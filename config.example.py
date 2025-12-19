@@ -1,5 +1,9 @@
 # Copy this file to `config.py` and paste your keys at the top.
 # Or set env vars instead (preferred): OPENAI_API_KEY, OPENAI_MODEL.
+# Web UI auth and rate limits are configured via env vars:
+#   WEBAPP_ADMIN_USERNAME, WEBAPP_ADMIN_PASSWORD (required for first admin), WEBAPP_SESSION_SECRET
+#   WEBAPP_RATE_LIMIT, WEBAPP_LOGIN_RATE_LIMIT, WEBAPP_SCAN_RATE_LIMIT, WEBAPP_ADMIN_RATE_LIMIT
+#   WEBAPP_MAX_PAGES_LIMIT, WEBAPP_MAX_PAGES_DEFAULT
 
 OPENAI_API_KEY = ""  # <-- paste your OpenAI API key here if you want
 OPENAI_MODEL = "gpt-4o-mini"

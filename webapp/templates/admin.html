@@ -1,0 +1,108 @@
+{% extends "base.html" %}
+{% set title = "Admin Paneli" %}
+
+{% block content %}
+  <div class="row g-4">
+    <div class="col-12 col-xl-8">
+      <div class="card shadow-sm">
+        <div class="card-header">
+          <h1 class="h4 mb-0">Admin Paneli</h1>
+          <div class="text-muted small">Kullanıcı yönetimi ve tarama limitleri.</div>
+        </div>
+        <div class="card-body">
+          {% if message %}
+            <div class="alert alert-success py-2 mb-3">{{ message }}</div>
+          {% endif %}
+          {% if error %}
+            <div class="alert alert-danger py-2 mb-3">{{ error }}</div>
+          {% endif %}
+          <form class="row g-3" method="post" action="/admin/settings">
+            <div class="col-md-6">
+              <label class="form-label">Max Pages (üst limit)</label>
+              <input type="number" class="form-control" name="max_pages_limit" min="1" max="2000" value="{{ settings.max_pages_limit }}" required />
+              <div class="form-text">Sunucu sınırı (1-2000). Kullanıcı girişlerinde aşılmaz.</div>
+            </div>
+            <div class="col-md-6">
+              <label class="form-label">Varsayılan Max Pages</label>
+              <input type="number" class="form-control" name="max_pages_default" min="1" max="2000" value="{{ settings.max_pages_default }}" required />
+              <div class="form-text">Formda gösterilecek varsayılan değer.</div>
+            </div>
+            <div class="col-12 d-flex justify-content-end">
+              <button class="btn btn-primary" type="submit">Ayarları Kaydet</button>
+            </div>
+          </form>
+        </div>
+      </div>
+    </div>
+
+    <div class="col-12 col-xl-4 d-flex flex-column gap-3">
+      <div class="card shadow-sm">
+        <div class="card-header">
+          <div class="card-title">Kullanıcılar</div>
+        </div>
+        <div class="card-body">
+          {% if not users %}
+            <p class="text-muted mb-0">Kayıtlı kullanıcı yok.</p>
+          {% else %}
+            <div class="list-group list-group-flush">
+              {% for u in users %}
+                <div class="list-group-item d-flex justify-content-between align-items-center">
+                  <span>{{ u.username }}</span>
+                  <span class="badge {% if u.role == 'admin' %}bg-success{% else %}bg-secondary{% endif %}">{{ u.role }}</span>
+                </div>
+              {% endfor %}
+            </div>
+          {% endif %}
+        </div>
+      </div>
+
+      <div class="card shadow-sm">
+        <div class="card-header">
+          <div class="card-title">Yeni Kullanıcı</div>
+        </div>
+        <div class="card-body">
+          <form method="post" action="/admin/users" class="vstack gap-2">
+            <input type="hidden" name="action" value="create" />
+            <div>
+              <label class="form-label">Kullanıcı Adı</label>
+              <input class="form-control" name="username" minlength="3" placeholder="yeni-kullanici" required />
+            </div>
+            <div>
+              <label class="form-label">Şifre</label>
+              <input class="form-control" name="password" type="password" minlength="8" autocomplete="new-password" required />
+              <div class="form-text">En az 8 karakter.</div>
+            </div>
+            <div>
+              <label class="form-label">Rol</label>
+              <select class="form-select" name="role">
+                <option value="user">user</option>
+                <option value="admin">admin</option>
+              </select>
+            </div>
+            <button class="btn btn-primary w-100" type="submit">Kullanıcı Oluştur</button>
+          </form>
+        </div>
+      </div>
+
+      <div class="card shadow-sm">
+        <div class="card-header">
+          <div class="card-title">Şifre Sıfırla</div>
+        </div>
+        <div class="card-body">
+          <form method="post" action="/admin/users" class="vstack gap-2">
+            <input type="hidden" name="action" value="reset" />
+            <div>
+              <label class="form-label">Kullanıcı Adı</label>
+              <input class="form-control" name="username" placeholder="hedef kullanıcı" required />
+            </div>
+            <div>
+              <label class="form-label">Yeni Şifre</label>
+              <input class="form-control" name="password" type="password" minlength="8" autocomplete="new-password" required />
+            </div>
+            <button class="btn btn-outline-secondary w-100" type="submit">Şifreyi Güncelle</button>
+          </form>
+        </div>
+      </div>
+    </div>
+  </div>
+{% endblock %}

@@ -31,6 +31,10 @@ GENERIC_FILENAME_RE = re.compile(
     r"^(img|image|photo|picture|banner|slider|icon)[-_]?\d*$", re.IGNORECASE
 )
 CAMERA_FILENAME_RE = re.compile(r"^(img|dsc|pxl|screenshot)[-_]?\d+", re.IGNORECASE)
+ALT_BAD_REGEX = re.compile(
+    r"(adsiz|adsız|proje|şablon|sablon|template|ornek|örnek|example|chatgpt|openai|jjjj+|kkkk+|\(\d+\))",
+    re.IGNORECASE,
+)
 SITEMAP_LOC_RE = re.compile(r"<loc>\s*([^<\s]+)\s*</loc>", re.IGNORECASE)
 PLACEHOLDER_IMG_RE = re.compile(r"/blank\\.gif($|\\?)", re.IGNORECASE)
 IMAGE_EXTS = {".jpg", ".jpeg", ".png", ".webp", ".avif", ".gif", ".svg", ".bmp", ".ico"}
@@ -59,6 +63,12 @@ def is_probable_image_asset_url(url: str) -> bool:
         return False
     ext = os.path.splitext(last)[1].lower()
     return ext in IMAGE_EXTS
+
+
+def _tokenize(text: str) -> Set[str]:
+    if not text:
+        return set()
+    return set(re.findall(r"[a-z0-9]+", text.lower()))
 
 
 @dataclass(frozen=True)
@@ -1221,6 +1231,7 @@ def local_issues(pages: List[PageData]) -> List[Issue]:
                 )
             )
 
+        title_tokens = _tokenize(page.title) | _tokenize(page.meta_description)
         for img in page.images:
             if img.src.startswith(("http://", "https://")) and not is_probable_image_asset_url(img.src):
                 parsed = urlparse(img.src)
@@ -1252,6 +1263,19 @@ def local_issues(pages: List[PageData]) -> List[Issue]:
                         evidence=img.src or img.filename,
                     )
                 )
+            elif ALT_BAD_REGEX.search(img.alt or ""):
+                issues.append(
+                    Issue(
+                        url=url,
+                        issue_type="alt_generic",
+                        field="img_alt",
+                        severity="high",
+                        message="Alt text looks like a placeholder/spam (adsız/şablon/chatgpt/openai vb.).",
+                        suggestion="Konuya uygun, anlamlı bir alt metin yazın; adsız/şablon vb. ibareleri kaldırın.",
+                        category="images.accessibility",
+                        evidence=f"{img.src or img.filename} | alt={img.alt}",
+                    )
+                )
             elif GENERIC_ALT_RE.match(img.alt):
                 issues.append(
                     Issue(
@@ -1281,6 +1305,20 @@ def local_issues(pages: List[PageData]) -> List[Issue]:
                 )
 
             base = os.path.splitext(img.filename)[0]
+            if ALT_BAD_REGEX.search(base or "") or ALT_BAD_REGEX.search(img.src or ""):
+                issues.append(
+                    Issue(
+                        url=url,
+                        issue_type="placeholder_src",
+                        field="img_src",
+                        severity="high",
+                        message="Image URL/filename contains placeholder text (adsız/şablon/chatgpt/openai vb.).",
+                        suggestion="Dosya adını/URL'yi konuya uygun açıklayıcı kelimelerle güncelleyin.",
+                        category="images.accessibility",
+                        evidence=img.src or img.filename,
+                    )
+                )
+
             if base and (GENERIC_FILENAME_RE.match(base) or CAMERA_FILENAME_RE.match(base)):
                 issues.append(
                     Issue(
@@ -1292,6 +1330,23 @@ def local_issues(pages: List[PageData]) -> List[Issue]:
                         suggestion="Rename image file to a descriptive, hyphenated name.",
                         category="images.filename",
                         evidence=img.src or img.filename,
+                    )
+                )
+
+            base_tokens = _tokenize(base)
+            alt_tokens = _tokenize(img.alt)
+            name_tokens = base_tokens | alt_tokens
+            if title_tokens and len(title_tokens) >= 3 and name_tokens and (name_tokens & title_tokens) == set():
+                issues.append(
+                    Issue(
+                        url=url,
+                        issue_type="mismatch",
+                        field="img_seo",
+                        severity="low",
+                        message="Image filename/alt does not align with page title/description.",
+                        suggestion="Dosya adı veya alt metni sayfa başlığı/konusuyla uyumlu hale getirin.",
+                        category="images.seo_meta",
+                        evidence=f"{img.filename} | title={page.title}",
                     )
                 )
 
@@ -1785,15 +1840,17 @@ def gpt_summaries(
 
     system = (
         "Sen deneyimli bir SEO ve web performans uzmanısın. "
-        "Kullanıcıya kısa, net ve aksiyon odaklı özet ver. "
-        "Sadece verilen veri üzerinden konuş; uydurma yapma."
+        "Çıktıyı TÜRKÇE yaz. "
+        "Kullanıcıya daha kapsamlı, net ve aksiyon odaklı özet ver. "
+        "Sadece verilen veri üzerinden konuş; uydurma yapma. "
+        "Title/meta/H1 uyumu, hreflang/html lang, görsel alt/format/lazy-load, performans ve güvenlik başlıklarını da değerlendir."
     )
 
     user = (
         "Aşağıdaki tarama verisi için:\n"
         "1) Site/origin için daha detaylı genel özet çıkar:\n"
-        "   - 6-10 cümle, aksiyon odaklı.\n"
-        "   - 3-5 maddelik 'Öncelikli aksiyonlar' listesi ekle.\n"
+        "   - 8-14 cümle, aksiyon odaklı, tek paragraf.\n"
+        "   - 4-6 maddelik 'Öncelikli aksiyonlar' listesi ekle.\n"
         "   - 2-3 tane 'Örnek' ver: (ör. belirli sayfa URL'lerinde title/meta uyumsuzluğu, alt eksikliği, LCP görseli).\n"
         "2) Her sayfa için 1-2 cümlelik 'Bu sayfanın genel sorunu' özetini yaz.\n\n"
         "3) Her sayfa için görsellerin sayfanın Title + Meta Description ile ne kadar alakalı olduğunu 0-100 arasında puanla.\n"
@@ -1824,8 +1881,8 @@ def gpt_summaries(
         image_relevance_raw = {}
 
     # Safety clamp for UI/persistence.
-    if len(site_summary) > 2400:
-        site_summary = site_summary[:2400] + "..."
+    if len(site_summary) > 3200:
+        site_summary = site_summary[:3200] + "..."
     cleaned_page_summaries: Dict[str, str] = {}
     for k, v in page_summaries.items():
         key = str(k or "").strip()

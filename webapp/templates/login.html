@@ -2,26 +2,30 @@
 {% set title = "Giriş" %}
 
 {% block content %}
-  <div class="auth">
-    <div class="card auth__card">
-      <h1>Giriş</h1>
-      <p class="muted">Devam etmek için giriş yapın.</p>
-
-      {% if error %}
-        <div class="error">{{ error }}</div>
-      {% endif %}
-
-      <form method="post" action="/login" class="auth__form">
-        <div class="field">
-          <label>Kullanıcı Adı</label>
-          <input name="username" placeholder="lema" autocomplete="username" required />
+  <div class="row justify-content-center">
+    <div class="col-md-5">
+      <div class="card shadow-sm">
+        <div class="card-header">
+          <h1 class="h4 mb-0">Giriş</h1>
+          <div class="text-muted small">Devam etmek için giriş yapın.</div>
         </div>
-        <div class="field">
-          <label>Şifre</label>
-          <input name="password" type="password" placeholder="1234" autocomplete="current-password" required />
+        <div class="card-body">
+          {% if error %}
+            <div class="alert alert-danger">{{ error }}</div>
+          {% endif %}
+          <form method="post" action="/login" class="vstack gap-3">
+            <div>
+              <label class="form-label">Kullanıcı Adı</label>
+              <input class="form-control" name="username" placeholder="lema" autocomplete="username" required />
+            </div>
+            <div>
+              <label class="form-label">Şifre</label>
+              <input class="form-control" name="password" type="password" placeholder="••••••••" autocomplete="current-password" required />
+            </div>
+            <button class="btn btn-primary w-100" type="submit">Giriş Yap</button>
+          </form>
         </div>
-        <button class="btn" type="submit">Giriş Yap</button>
-      </form>
+      </div>
     </div>
   </div>
 {% endblock %}

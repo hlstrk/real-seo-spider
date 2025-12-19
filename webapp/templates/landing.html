@@ -1,0 +1,234 @@
+{% extends "base.html" %}
+{% set title = "SEO Pulse" %}
+{% set body_class = "landing-body" %}
+
+{% block extra_head %}
+  <link
+    rel="preconnect"
+    href="https://fonts.googleapis.com">
+  <link
+    rel="preconnect"
+    href="https://fonts.gstatic.com"
+    crossorigin>
+  <link
+    href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600;700&display=swap"
+    rel="stylesheet">
+  <link rel="stylesheet" href="/static/funel.css" />
+{% endblock %}
+
+{% block content %}
+  <header class="funel-header">
+    <div class="container">
+      <a href="/" class="logo">
+        <img src="https://cdn.lemaclinic.com/wp-content/uploads/2025/09/logo-lema-with-ada-768x123.webp" alt="SEO Pulse" style="max-height:40px">
+      </a>
+      <div class="funel-navbar-wrapper">
+        <button class="funel-navbar-menu-btn" data-navbar-toggle-btn>
+          <ion-icon name="menu-outline"></ion-icon>
+        </button>
+        <nav class="funel-navbar" data-navbar>
+          <ul class="funel-navbar-list">
+            <li class="funel-nav-item"><a href="#home" class="funel-nav-link">Home</a></li>
+            <li class="funel-nav-item"><a href="#about" class="funel-nav-link">Özellikler</a></li>
+            <li class="funel-nav-item"><a href="#features" class="funel-nav-link">Neden biz?</a></li>
+            <li class="funel-nav-item"><a href="#contact" class="funel-nav-link">İletişim</a></li>
+          </ul>
+          <div class="d-flex gap-2 align-items-center">
+            <a class="btn btn-primary" href="/login">Panele Giriş</a>
+          </div>
+        </nav>
+      </div>
+    </div>
+  </header>
+
+  <main id="home">
+    <article>
+      <section class="hero">
+        <div class="container">
+          <div class="hero-content">
+            <h1 class="h1 hero-title">Gerçek tarayıcı + akıllı raporlar</h1>
+            <p class="hero-text">
+              Chromium ile korumalı siteleri tarayın, OpenAI özetleri alın, görsel kalite hatalarını yakalayın, CSV/JSON rapor indirin.
+            </p>
+            <a class="btn btn-primary" href="/login">Panele Giriş Yap</a>
+          </div>
+          <div class="hero-banner"></div>
+        </div>
+        <img src="https://raw.githubusercontent.com/Amit-Ashok-Swain/Funel-Application-Landing-Page/master/assets/images/bg.png" alt="shape" class="shape-content">
+      </section>
+
+      <section class="about" id="about">
+        <div class="container">
+          <div class="about-top">
+            <h2 class="h2 section-title">Neler yapıyoruz?</h2>
+            <p class="section-text">
+              Gerçek sayfa taraması, görsel/lazy-load/responsive kontrolleri, OpenAI özetleri ve indirilebilir raporlar.
+            </p>
+            <ul class="about-list">
+              <li>
+                <div class="about-card">
+                  <div class="card-icon"><ion-icon name="rocket-outline"></ion-icon></div>
+                  <h3 class="h3 card-title">Chromium Taraması</h3>
+                  <p class="card-text">Cloudflare ve dinamik sayfalarda gerçek tarayıcı ile keşif.</p>
+                </div>
+              </li>
+              <li>
+                <div class="about-card">
+                  <div class="card-icon"><ion-icon name="image-outline"></ion-icon></div>
+                  <h3 class="h3 card-title">Görsel Kalitesi</h3>
+                  <p class="card-text">Alt metin, srcset, lazy-load, format ve boyut kontrolleri.</p>
+                </div>
+              </li>
+              <li>
+                <div class="about-card">
+                  <div class="card-icon"><ion-icon name="chatbubbles-outline"></ion-icon></div>
+                  <h3 class="h3 card-title">OpenAI Özetleri</h3>
+                  <p class="card-text">Sayfa/site özetleri, görsel uygunluk skorları ve GPT önerileri.</p>
+                </div>
+              </li>
+            </ul>
+          </div>
+
+          <div class="about-bottom">
+            <figure class="about-bottom-banner">
+              <img src="https://raw.githubusercontent.com/Amit-Ashok-Swain/Funel-Application-Landing-Page/master/assets/images/about-banner.png" alt="about banner" class="about-banner">
+            </figure>
+            <div class="about-bottom-content">
+              <h2 class="h2 section-title">Başlaması 1 dakikadan az</h2>
+              <p class="section-text">
+                Start URL ve domain gir, dil/limit belirle, Chromium ve GPT’yi aç/kapat. Taramalar otomatik kaydedilir.
+              </p>
+              <a class="btn btn-secondary" href="/login">Panele Git</a>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <section class="features" id="features">
+        <div class="container">
+          <h2 class="h2 section-title">İş akışına uygun</h2>
+          <p class="section-text">
+            CSV & JSON rapor, ekran görüntüleri, kategorilere göre skorlar, security header kontrolü.
+          </p>
+          <ul class="features-list">
+            <li class="features-item">
+              <figure class="features-item-banner">
+                <img src="https://raw.githubusercontent.com/Amit-Ashok-Swain/Funel-Application-Landing-Page/master/assets/images/feature-1.png" alt="feature banner">
+              </figure>
+              <div class="feature-item-content">
+                <h3 class="h2 item-title">Checklist & Skorlar</h3>
+                <p class="item-text">Meta, başlıklar, görseller ve performans için donut/pie skorları; checklist ile takip.</p>
+              </div>
+            </li>
+            <li class="features-item">
+              <figure class="features-item-banner">
+                <img src="https://raw.githubusercontent.com/Amit-Ashok-Swain/Funel-Application-Landing-Page/master/assets/images/feature-2.png" alt="feature banner">
+              </figure>
+              <div class="feature-item-content">
+                <h3 class="h2 item-title">Güvenlik Başlıkları</h3>
+                <p class="item-text">HSTS, CSP, X-Content-Type-Options, Referrer-Policy, Permissions-Policy, X-Frame-Options kontrolü.</p>
+              </div>
+            </li>
+          </ul>
+        </div>
+      </section>
+
+      <section class="cta">
+        <div class="container">
+          <div class="cta-card">
+            <h3 class="cta-title">Hemen dene</h3>
+            <p class="cta-text">Giriş yap, start URL gir, Chromium ile tarayı başlat. GPT key’in varsa özetleri aç.</p>
+            <a class="btn btn-secondary" href="/login">Panele Giriş</a>
+          </div>
+        </div>
+      </section>
+
+      <section class="contact" id="contact">
+        <div class="container">
+          <div class="contact-content">
+            <h2 class="h2 contact-title">Soruların mı var?</h2>
+            <figure class="contact-banner">
+              <img src="https://raw.githubusercontent.com/Amit-Ashok-Swain/Funel-Application-Landing-Page/master/assets/images/contact.png" alt="contact banner">
+            </figure>
+          </div>
+          <div class="contact-form">
+            <div class="input-wrapper">
+              <label class="input-label">E-posta</label>
+              <input class="input-field" type="email" placeholder="destek@lemaclinic.com" disabled>
+            </div>
+            <p class="input-label">İletişim için admin panelindeki iletişim bilgilerini kullanın.</p>
+          </div>
+        </div>
+      </section>
+    </article>
+  </main>
+
+  <footer class="funel-footer">
+    <div class="footer-top">
+      <div class="container">
+        <div class="footer-brand">
+          <a href="#" class="logo">
+            <img src="https://cdn.lemaclinic.com/wp-content/uploads/2025/09/logo-lema-with-ada-768x123.webp" alt="SEO Pulse">
+          </a>
+          <p class="footer-text">Chromium tabanlı SEO denetimi</p>
+          <ul class="social-list">
+            <li><a href="#" class="social-link"><ion-icon name="logo-github"></ion-icon></a></li>
+            <li><a href="#" class="social-link"><ion-icon name="logo-instagram"></ion-icon></a></li>
+            <li><a href="#" class="social-link"><ion-icon name="logo-youtube"></ion-icon></a></li>
+            <li><a href="#" class="social-link"><ion-icon name="logo-facebook"></ion-icon></a></li>
+          </ul>
+        </div>
+        <div class="footer-link-box">
+          <ul class="footer-link-list">
+            <li><h3 class="h4 link-title">Ürün</h3></li>
+            <li><a href="#home" class="footer-link">Özellikler</a></li>
+            <li><a href="#features" class="footer-link">Neden biz</a></li>
+            <li><a href="/login" class="footer-link">Giriş</a></li>
+          </ul>
+          <ul class="footer-link-list">
+            <li><h3 class="h4 link-title">Kaynak</h3></li>
+            <li><a href="#contact" class="footer-link">Destek</a></li>
+            <li><a href="#" class="footer-link">Güncellemeler</a></li>
+            <li><a href="#" class="footer-link">Gizlilik</a></li>
+          </ul>
+          <ul class="footer-link-list">
+            <li><h3 class="h4 link-title">Raporlar</h3></li>
+            <li><a href="/login" class="footer-link">CSV/JSON</a></li>
+            <li><a href="/login" class="footer-link">Ekran görüntüleri</a></li>
+            <li><a href="/login" class="footer-link">Güvenlik başlıkları</a></li>
+          </ul>
+        </div>
+      </div>
+    </div>
+    <div class="footer-bottom">
+      <p class="copyright">&copy; 2025 SEO Pulse</p>
+    </div>
+  </footer>
+
+  <a href="#home" class="go-top" data-go-top>
+    <ion-icon name="chevron-up-outline"></ion-icon>
+  </a>
+{% endblock %}
+
+{% block extra_scripts %}
+  <script type="module" src="https://unpkg.com/ionicons@5.5.2/dist/ionicons/ionicons.esm.js"></script>
+  <script nomodule src="https://unpkg.com/ionicons@5.5.2/dist/ionicons/ionicons.js"></script>
+  <script>
+    (function () {
+      const nav = document.querySelector("[data-navbar]");
+      const toggle = document.querySelector("[data-navbar-toggle-btn]");
+      const goTop = document.querySelector("[data-go-top]");
+      if (toggle && nav) {
+        toggle.addEventListener("click", () => {
+          nav.classList.toggle("active");
+        });
+      }
+      window.addEventListener("scroll", () => {
+        if (goTop) {
+          if (window.scrollY > 300) goTop.classList.add("active");
+          else goTop.classList.remove("active");
+        }
+      });
+    })();
+  </script>
+{% endblock %}

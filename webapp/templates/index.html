@@ -2,114 +2,182 @@
 {% set title = "Yeni Tarama" %}
 
 {% block content %}
-  <div class="split">
-    <div>
-      <div class="hero">
-        <h1>SEO Taraması Başlat</h1>
-        <p>
-          Cloudflare nedeniyle varsayılan fetcher <code>chromium</code>.
-          Tarama bitince otomatik olarak <b>Sonuçlar</b> sayfasına yönlendirilir.
-        </p>
+  <div class="page-header mb-3">
+    <div class="row align-items-center">
+      <div class="col">
+        <h1 class="page-title">SEO Taraması Başlat</h1>
+        <div class="text-muted">İki mod: Basit (adım adım) ve Gelişmiş (tüm ayarlar). Varsayılan fetcher <span class="badge bg-secondary">chromium</span>. Tarama bitince otomatik olarak <strong>Sonuçlar</strong> sayfasına yönlendirilirsin.</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="row g-3">
+    <div class="col-12 col-xl-8">
+      <div class="card mb-3">
+        <div class="card-header">
+          <div class="card-title">Basit Mod</div>
+          <div class="text-muted small">Adım adım yönlendirme</div>
+        </div>
+        <div class="card-body">
+          <ol class="text-muted mb-3 ps-3">
+            <li>Başlangıç URL'ini ve domain'i gir.</li>
+            <li>Maksimum sayfa sayısını belirle.</li>
+            <li>İstersen sitemap ve GPT seçeneklerini aç.</li>
+            <li>Başlat'a bas, sonuçlar otomatik açılır.</li>
+          </ol>
+          <form class="row g-3" method="post" action="/scan">
+            <div class="col-md-6">
+              <label class="form-label">Start URL</label>
+              <input class="form-control" name="start_url" value="{{ defaults.start_url }}" required />
+            </div>
+            <div class="col-md-6">
+              <label class="form-label">Domain</label>
+              <input class="form-control" name="domain" value="{{ defaults.domain }}" required />
+            </div>
+            <div class="col-md-4">
+              <label class="form-label">Max Pages</label>
+              <input class="form-control" name="max_pages" type="number" min="1" max="{{ max_pages_limit }}" value="{{ defaults.max_pages }}" />
+              <div class="form-text">Sunucu limiti: {{ max_pages_limit }}</div>
+            </div>
+            <div class="col-md-4 d-flex align-items-end">
+              <div class="form-check">
+                <input class="form-check-input" type="checkbox" name="use_sitemap" id="simpleSitemap" />
+                <label class="form-check-label" for="simpleSitemap">Sitemap kullan</label>
+              </div>
+            </div>
+            <div class="col-md-4 d-flex align-items-end">
+              <div class="form-check">
+                <input class="form-check-input" type="checkbox" name="follow_redirects" id="simpleRedirects" />
+                <label class="form-check-label" for="simpleRedirects">Redirect takip et</label>
+              </div>
+            </div>
+            <div class="col-md-6 d-flex align-items-end">
+              <div class="form-check">
+                <input class="form-check-input" type="checkbox" name="no_gpt" id="simpleNoGpt" />
+                <label class="form-check-label" for="simpleNoGpt">GPT kapalı kalsın</label>
+              </div>
+              <div class="form-text ms-2">Key env'de varsa GPT özetleri üretilir.</div>
+            </div>
+            <div class="col-12 d-flex justify-content-end">
+              <button class="btn btn-primary" type="submit">Basit Taramayı Başlat</button>
+            </div>
+            <input type="hidden" name="mode" value="crawl" />
+            <input type="hidden" name="fetcher" value="{{ defaults.fetcher }}" />
+            <input type="hidden" name="scope_prefixes" value="{{ defaults.scope_prefixes }}" />
+            <input type="hidden" name="require_lang" value="{{ defaults.require_lang }}" />
+            <input type="hidden" name="timeout" value="{{ defaults.timeout }}" />
+            <input type="hidden" name="sleep" value="{{ defaults.sleep }}" />
+            <input type="hidden" name="model" value="{{ defaults.model }}" />
+          </form>
+        </div>
       </div>
 
-      <form class="card" method="post" action="/scan">
-        <div class="grid">
-          <div class="field">
-            <label>Start URL</label>
-            <input name="start_url" value="{{ defaults.start_url }}" placeholder="https://lemaclinic.com/" required />
-          </div>
-          <div class="field">
-            <label>Domain</label>
-            <input name="domain" value="{{ defaults.domain }}" placeholder="lemaclinic.com" required />
-          </div>
-
-          <div class="field">
-            <label>Mode</label>
-            <select name="mode">
-              <option value="single" {% if defaults.mode == "single" %}selected{% endif %}>single</option>
-              <option value="crawl" {% if defaults.mode == "crawl" %}selected{% endif %}>crawl</option>
-            </select>
-          </div>
-          <div class="field">
-            <label>Fetcher</label>
-            <select name="fetcher">
-              <option value="chromium" {% if defaults.fetcher == "chromium" %}selected{% endif %}>chromium (önerilen)</option>
-              <option value="requests" {% if defaults.fetcher == "requests" %}selected{% endif %}>requests</option>
-            </select>
-          </div>
-
-          <div class="field">
-            <label>Scope Prefix(es) (virgülle)</label>
-            <input name="scope_prefixes" value="{{ defaults.scope_prefixes }}" placeholder="/, /en/" />
-            <div class="hint">İngilizce sayfalar direkt domain altındaysa: <code>/</code></div>
-          </div>
-          <div class="field">
-            <label>Require &lt;html lang&gt;</label>
-            <input name="require_lang" value="{{ defaults.require_lang }}" placeholder="en" />
-            <div class="hint">Boş bırakırsan dil filtresi uygulanmaz.</div>
-          </div>
-
-          <div class="field">
-            <label>Max Pages (crawl)</label>
-            <input name="max_pages" type="number" min="1" value="{{ defaults.max_pages }}" />
-          </div>
-          <div class="field">
-            <label>Timeout (sec)</label>
-            <input name="timeout" type="number" min="1" value="{{ defaults.timeout }}" />
-          </div>
-
-          <div class="field">
-            <label>GPT Model</label>
-            <input name="model" value="{{ defaults.model }}" placeholder="gpt-4o-mini" />
-            <div class="hint">API key UI'da yok. Key'i env var veya koda ekleyin.</div>
-          </div>
-          <div class="field">
-            <label>GPT sleep (sec)</label>
-            <input name="sleep" type="number" min="0" step="0.1" value="{{ defaults.sleep }}" />
-          </div>
+      <div class="card">
+        <div class="card-header">
+          <div class="card-title">Gelişmiş Mod</div>
+          <div class="text-muted small">Tüm ayarlar ve kontrol</div>
         </div>
-
-        <div class="row">
-          <label class="checkbox">
-            <input type="checkbox" name="use_sitemap" />
-            sitemap kullan (crawl)
-          </label>
-          <label class="checkbox">
-            <input type="checkbox" name="follow_redirects" />
-            redirect takip et (single)
-          </label>
-          <label class="checkbox">
-            <input type="checkbox" name="no_gpt" />
-            GPT kapalı
-          </label>
-          <div class="spacer"></div>
-          <button class="btn" type="submit">Taramayı Başlat</button>
+        <div class="card-body">
+          <form class="row g-3" method="post" action="/scan">
+            <div class="col-md-6">
+              <label class="form-label">Start URL</label>
+              <input class="form-control" name="start_url" value="{{ defaults.start_url }}" required />
+            </div>
+            <div class="col-md-6">
+              <label class="form-label">Domain</label>
+              <input class="form-control" name="domain" value="{{ defaults.domain }}" required />
+            </div>
+            <div class="col-md-3">
+              <label class="form-label">Mode</label>
+              <select class="form-select" name="mode">
+                <option value="single" {% if defaults.mode == "single" %}selected{% endif %}>single</option>
+                <option value="crawl" {% if defaults.mode == "crawl" %}selected{% endif %}>crawl</option>
+              </select>
+            </div>
+            <div class="col-md-3">
+              <label class="form-label">Fetcher</label>
+              <select class="form-select" name="fetcher">
+                <option value="chromium" {% if defaults.fetcher == "chromium" %}selected{% endif %}>chromium (önerilen)</option>
+                <option value="requests" {% if defaults.fetcher == "requests" %}selected{% endif %}>requests</option>
+              </select>
+            </div>
+            <div class="col-md-6">
+              <label class="form-label">Scope Prefix(es) (virgülle)</label>
+              <input class="form-control" name="scope_prefixes" value="{{ defaults.scope_prefixes }}" placeholder="/, /en/" />
+              <div class="form-text">İngilizce sayfalar direkt domain altındaysa: <code>/</code></div>
+            </div>
+            <div class="col-md-6">
+              <label class="form-label">Require &lt;html lang&gt;</label>
+              <input class="form-control" name="require_lang" value="{{ defaults.require_lang }}" placeholder="en" />
+              <div class="form-text">Boş bırakırsan dil filtresi uygulanmaz.</div>
+            </div>
+            <div class="col-md-3">
+              <label class="form-label">Max Pages (crawl)</label>
+              <input class="form-control" name="max_pages" type="number" min="1" max="{{ max_pages_limit }}" value="{{ defaults.max_pages }}" />
+              <div class="form-text">Sunucu limit: {{ max_pages_limit }}</div>
+            </div>
+            <div class="col-md-3">
+              <label class="form-label">Timeout (sec)</label>
+              <input class="form-control" name="timeout" type="number" min="1" value="{{ defaults.timeout }}" />
+            </div>
+            <div class="col-md-3">
+              <label class="form-label">GPT Model</label>
+              <input class="form-control" name="model" value="{{ defaults.model }}" />
+              <div class="form-text">API key UI'da yok. Key'i env var veya koda ekleyin.</div>
+            </div>
+            <div class="col-md-3">
+              <label class="form-label">GPT sleep (sec)</label>
+              <input class="form-control" name="sleep" type="number" min="0" step="0.1" value="{{ defaults.sleep }}" />
+            </div>
+            <div class="col-md-4 d-flex align-items-end">
+              <div class="form-check">
+                <input class="form-check-input" type="checkbox" name="use_sitemap" id="advSitemap" />
+                <label class="form-check-label" for="advSitemap">Sitemap kullan (crawl)</label>
+              </div>
+            </div>
+            <div class="col-md-4 d-flex align-items-end">
+              <div class="form-check">
+                <input class="form-check-input" type="checkbox" name="follow_redirects" id="advRedirects" />
+                <label class="form-check-label" for="advRedirects">Redirect takip et (single)</label>
+              </div>
+            </div>
+            <div class="col-md-4 d-flex align-items-end">
+              <div class="form-check">
+                <input class="form-check-input" type="checkbox" name="no_gpt" id="advNoGpt" />
+                <label class="form-check-label" for="advNoGpt">GPT kapalı</label>
+              </div>
+            </div>
+            <div class="col-12 d-flex justify-content-end">
+              <button class="btn btn-outline-primary" type="submit">Gelişmiş Taramayı Başlat</button>
+            </div>
+          </form>
         </div>
-      </form>
+      </div>
     </div>
 
-    <aside class="side">
-      <div class="card">
-        <h3>Önceki Taramalar</h3>
-        {% if not jobs %}
-          <p class="muted">Henüz tarama yok.</p>
-        {% else %}
-          <div class="jobs">
-            {% for j in jobs %}
-              <a class="job" href="/results/{{ j.id }}">
-                <div class="job__row">
-                  <span class="pill pill--{{ j.status }}">{{ TR.status.get(j.status, j.status) }}</span>
-                  <span class="job__id">{{ j.id }}</span>
-                </div>
-                <div class="job__meta">
-                  <div class="job__url">{{ (j.params.get("start_url") or "")|truncate(60, True, "…") }}</div>
-                  <div class="muted">{{ (j.params.get("mode") or "") }} • {{ (j.params.get("fetcher") or "") }}</div>
-                </div>
-              </a>
-            {% endfor %}
-          </div>
-        {% endif %}
+    <div class="col-12 col-xl-4">
+      <div class="card h-100">
+        <div class="card-header">
+          <div class="card-title">Önceki Taramalar</div>
+        </div>
+        <div class="card-body">
+          {% if not jobs %}
+            <p class="text-muted mb-0">Henüz tarama yok.</p>
+          {% else %}
+            <div class="list-group list-group-flush">
+              {% for j in jobs %}
+                <a class="list-group-item d-flex justify-content-between align-items-start" href="/results/{{ j.id }}">
+                  <div>
+                    <div class="fw-semibold">{{ (j.params.get("start_url") or "")|truncate(60, True, "…") }}</div>
+                    <div class="text-muted small">{{ (j.params.get("mode") or "") }} · {{ (j.params.get("fetcher") or "") }}</div>
+                  </div>
+                  <span class="badge bg-secondary">{{ TR.status.get(j.status, j.status) }}</span>
+                </a>
+              {% endfor %}
+            </div>
+          {% endif %}
+        </div>
       </div>
-    </aside>
+    </div>
   </div>
 {% endblock %}

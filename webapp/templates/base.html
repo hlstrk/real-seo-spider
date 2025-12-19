@@ -1,69 +1,64 @@
 <!doctype html>
-<html lang="tr" data-theme="light">
+<html lang="tr">
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width,initial-scale=1" />
-    <title>{{ title or "real-seo-spider" }}</title>
+    <title>{{ title or "SEO Pulse" }}</title>
     <link rel="icon" href="/static/favicon.svg" type="image/svg+xml" />
+    <link
+      href="https://cdn.jsdelivr.net/npm/@tabler/core@1.0.0-beta20/dist/css/tabler.min.css"
+      rel="stylesheet"
+      crossorigin="anonymous"
+    />
+    <link
+      rel="stylesheet"
+      href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css"
+      crossorigin="anonymous"
+    />
     <link rel="stylesheet" href="/static/style.css" />
-    {% if refresh %}
-    <meta http-equiv="refresh" content="2" />
-    {% endif %}
+    {% block extra_head %}{% endblock %}
   </head>
   <body>
-    <div class="bg"></div>
-    <header class="topbar">
-      <div class="container topbar__inner">
-        <div class="brand">
-          <img
-            class="brand__logo"
-            src="https://cdn.lemaclinic.com/wp-content/uploads/2025/09/logo-lema-with-ada-768x123.webp"
-            alt="Lema Clinic"
-            loading="eager"
-          />
-          <div class="brand__text">
-            <div class="brand__title">real-seo-spider</div>
-            <div class="brand__subtitle">Chromium tabanlı SEO audit</div>
-          </div>
+    {% if body_class != "landing-body" %}
+    <header class="navbar navbar-light bg-white shadow-sm">
+      <div class="container-xl">
+        <a class="navbar-brand" href="/">
+          <img src="https://cdn.lemaclinic.com/wp-content/uploads/2025/09/logo-lema-with-ada-768x123.webp" alt="Lema" height="28" class="me-2" />
+          <span class="fw-bold">SEO Pulse</span>
+          <small class="text-muted ms-1 d-none d-sm-inline">Chromium tabanlı SEO denetimi</small>
+        </a>
+        <div class="navbar-nav flex-row ms-auto gap-2 align-items-center">
+          {% if request.session.get("auth") == "ok" %}
+            <a class="btn btn-primary btn-sm" href="/">Yeni Tarama</a>
+            {% if request.session.get("role") == "admin" %}
+              <a class="btn btn-outline-primary btn-sm" href="/admin">Admin</a>
+            {% endif %}
+            <a class="btn btn-outline-secondary btn-sm" href="/logout">Çıkış</a>
+          {% else %}
+            <a class="btn btn-primary btn-sm" href="/login">Giriş</a>
+          {% endif %}
         </div>
-        <nav class="nav">
-          <button class="nav__btn" id="themeToggle" type="button" aria-label="Tema değiştir">
-            <span id="themeLabel">Açık</span>
-          </button>
-          <a class="nav__link" href="/">Yeni Tarama</a>
-          <a class="nav__link" href="/logout">Çıkış</a>
-        </nav>
       </div>
     </header>
+    {% endif %}
 
-    <main class="container">
-      {% block content %}{% endblock %}
+    <main class="{% if body_class == 'landing-body' %}page{% else %}page page-center{% endif %}">
+      <div class="{% if body_class == 'landing-body' %}container-xl py-4{% else %}container-xl py-4{% endif %}">
+        {% block content %}{% endblock %}
+      </div>
     </main>
 
-    <footer class="footer container">
-      <div>Local web app • FastAPI • Playwright Chromium</div>
+    {% if body_class != "landing-body" %}
+    <footer class="footer footer-transparent">
+      <div class="container-xl">
+        <div class="text-muted small py-3">Local web app • FastAPI • Playwright Chromium</div>
+      </div>
     </footer>
+    {% endif %}
 
-    <script>
-      (function () {
-        const root = document.documentElement;
-        const key = "rss_theme";
-        const btn = document.getElementById("themeToggle");
-        const label = document.getElementById("themeLabel");
-        function apply(theme) {
-          root.setAttribute("data-theme", theme);
-          if (label) label.textContent = theme === "dark" ? "Koyu" : "Açık";
-        }
-        const initial = localStorage.getItem(key) || "light";
-        apply(initial);
-        if (btn) {
-          btn.addEventListener("click", () => {
-            const next = root.getAttribute("data-theme") === "dark" ? "light" : "dark";
-            localStorage.setItem(key, next);
-            apply(next);
-          });
-        }
-      })();
-    </script>
+    <script src="https://cdn.jsdelivr.net/npm/@tabler/core@1.0.0-beta20/dist/js/tabler.min.js" crossorigin="anonymous"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js" crossorigin="anonymous"></script>
+    {% block extra_modals %}{% endblock %}
+    {% block extra_scripts %}{% endblock %}
   </body>
 </html>

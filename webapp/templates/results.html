@@ -2,130 +2,261 @@
 {% set title = "Sonuçlar" %}
 
 {% block content %}
-  <div class="layout">
-    <aside class="leftnav">
-      <div class="card leftnav__card">
-        <h3>Kategoriler</h3>
-        {% if job and job.status == "done" and issues_count > 0 %}
-          <div class="cats" id="catList">
-            <button class="cat cat--active" type="button" data-cat="__all__">
-              <span>Tümü</span>
-              <span class="pill pill--muted">{{ issues_count }}</span>
-            </button>
-            {% for (cat, count) in categories %}
-              <button class="cat" type="button" data-cat="{{ cat }}">
-                <span>{{ cat }}</span>
-                <span class="pill pill--muted">{{ count }}</span>
-              </button>
-            {% endfor %}
-          </div>
-          <div class="hint" style="margin-top:10px">Kategori seçince checklist filtrelenir.</div>
-        {% else %}
-          <p class="muted">Kategori listesi için taramanın bitmesini bekleyin.</p>
-        {% endif %}
+  <div class="row g-3">
+    <aside class="col-12 col-lg-3">
+      <div class="card shadow-sm mt-0">
+        <div class="card-header">
+          <div class="card-title h6 mb-0">Önceki Taramalar</div>
+          <div class="text-muted small">URL ve zaman</div>
+        </div>
+        <div class="card-body">
+          {% if not jobs %}
+            <p class="text-muted mb-0">Henüz tarama yok.</p>
+          {% else %}
+            <div class="list-group list-group-flush">
+              {% for j in jobs %}
+                <div class="list-group-item d-flex justify-content-between align-items-center">
+                  <div class="text-truncate" style="max-width:70%;">
+                    <a href="/results/{{ j.id }}" class="fw-semibold text-decoration-none">{{ (j.params.get("start_url") or "")|truncate(80, True, "…") }}</a>
+                    <div class="text-muted small">{{ j.created_at|fmt_dt }}</div>
+                  </div>
+                  <span class="badge bg-secondary text-uppercase">{{ j.status }}</span>
+                </div>
+              {% endfor %}
+            </div>
+          {% endif %}
+        </div>
       </div>
     </aside>
 
-    <main class="main">
+    <main class="col-12 col-lg-9">
       {% if not job %}
-        <div class="card">
+        <div class="card shadow-sm mb-3">
           <h2>Job bulunamadı</h2>
           <p>Bu ID ile bir tarama yok: <code>{{ job_id }}</code></p>
           <a class="btn" href="/">Yeni tarama</a>
         </div>
       {% else %}
-        <div class="card">
-          <div class="row row--tight">
-            <div>
-              <h2>Genel Özet</h2>
-              <div class="muted">Bu tarama için hızlı özet + SEO tool tarzı şemalar.</div>
-            </div>
-          </div>
-
-          <div class="chart-row" style="margin-top:14px">
-            <div class="chart chart--mini">
-              <div class="chart__title">SEO Skoru</div>
-              <svg class="chart__svg" id="scoreDonut" viewBox="0 0 120 120" aria-label="SEO skoru donut"></svg>
-              <div class="chart__value"><b>{{ seo_score }}%</b></div>
-            </div>
-            <div class="chart chart--mini">
-              <div class="chart__title">Meta</div>
-              <svg class="chart__svg" id="metaDonut" viewBox="0 0 120 120" aria-label="Meta donut"></svg>
-              <div class="chart__value"><b id="metaVal">-</b></div>
-            </div>
-            <div class="chart chart--mini">
-              <div class="chart__title">Başlıklar</div>
-              <svg class="chart__svg" id="headersDonut" viewBox="0 0 120 120" aria-label="Headers donut"></svg>
-              <div class="chart__value"><b id="headersVal">-</b></div>
-            </div>
-            <div class="chart chart--mini">
-              <div class="chart__title">Görseller</div>
-              <svg class="chart__svg" id="imagesDonut" viewBox="0 0 120 120" aria-label="Images donut"></svg>
-              <div class="chart__value"><b id="imagesVal">-</b></div>
-            </div>
-            <div class="chart chart--mini">
-              <div class="chart__title">Performans</div>
-              <svg class="chart__svg" id="perfDonut" viewBox="0 0 120 120" aria-label="Performance donut"></svg>
-              <div class="chart__value"><b id="perfVal">-</b></div>
-            </div>
-            <div class="chart">
-              <div class="chart__title">Sorun Dağılımı</div>
-              <svg class="chart__svg" id="issuesPie" viewBox="0 0 120 120" width="120" height="120" aria-label="Issue pie"></svg>
-              <div class="chart__legend" id="issuesLegend"></div>
-            </div>
-          </div>
-
-          {% if site_summary %}
-            <p class="summary">{{ site_summary }}</p>
-          {% endif %}
-        </div>
-
-        <div class="card">
-          <div class="row row--tight">
-            <div>
-              <h2>Sonuçlar</h2>
-              <div class="muted">Tarama ID: <code>{{ job_id }}</code></div>
-              <div class="muted">Başlangıç: <code>{{ job.params.get("start_url") }}</code></div>
-            </div>
-            <div class="spacer"></div>
-            <a class="btn btn--ghost" href="/download/{{ job_id }}/issues.csv">CSV indir</a>
-            <a class="btn btn--ghost" href="/download/{{ job_id }}/report.json">JSON indir</a>
-          </div>
-
-          <div class="status">
-            <span class="pill pill--{{ job.status }}">{{ TR.status.get(job.status, job.status) }}</span>
-            {% if job.status in ["queued","running"] %}
-              <span class="muted">Tarama devam ediyor; bu sayfa otomatik yenilenir.</span>
-            {% endif %}
-            {% if job.status == "error" %}
-              <div class="error">Hata: {{ job.error }}</div>
-            {% endif %}
-          </div>
-
-          <div class="stats">
-            <div class="stat">
-              <div class="stat__label">Sayfalar</div>
-              <div class="stat__value">{{ pages_count }}</div>
-            </div>
-            <div class="stat">
-              <div class="stat__label">Sorunlar</div>
-              <div class="stat__value">{{ issues_count }}</div>
-            </div>
-          </div>
-        </div>
-
         {% if job.status == "done" %}
-          <div class="card">
+        <div class="card shadow-sm mb-3">
+          <div class="card-body">
+            <div class="row align-items-center g-3">
+              <div class="col">
+                <div class="d-flex align-items-center gap-2 mb-1">
+                  <h3 class="h5 mb-0">Güvenlik Başlıkları (HSTS vb.)</h3>
+                  <span class="badge text-bg-info">Beta</span>
+                </div>
+                <p class="text-muted mb-2 small">Strict-Transport-Security, CSP, X-Content-Type-Options, Referrer-Policy, Permissions-Policy, X-Frame-Options.</p>
+                <button class="btn btn-outline-primary btn-sm" type="button" data-bs-toggle="modal" data-bs-target="#secModal">Detayları Gör</button>
+              </div>
+              <div class="col-auto">
+                <div style="width:160px; height:160px;">
+                  <canvas id="secPie"></canvas>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div class="card shadow-sm mb-3">
+          <div class="card-body">
+            <div class="row row--tight mb-3">
+              <div>
+                <h3 class="h5 mb-1">Denetim Kapsamı</h3>
+                <div class="text-muted small">Bu taramada kontrol edilen başlıkların özeti (en az yarısı etkin).</div>
+              </div>
+            </div>
+            <div class="row g-3">
+              <div class="col-md-6">
+                <ul class="list-group list-group-flush">
+                  <li class="list-group-item d-flex justify-content-between align-items-start">
+                    <button class="btn btn-link p-0 text-start" data-coverage-detail="Sitemap & robots.txt; URL keşfi; iç link toplama ve normalize etme">
+                      <b>Sitemap & robots.txt</b> okuma + URL keşfi
+                    </button>
+                    <span class="badge text-bg-success">Aktif</span>
+                  </li>
+                  <li class="list-group-item d-flex justify-content-between align-items-start">
+                    <button class="btn btn-link p-0 text-start" data-coverage-detail="HTTP 2xx/3xx/4xx/5xx, redirect chain/loop ve content-type kontrolü">
+                      <b>HTTP durumları</b> 2xx/3xx/4xx/5xx, redirect zinciri
+                    </button>
+                    <span class="badge text-bg-success">Aktif</span>
+                  </li>
+                  <li class="list-group-item d-flex justify-content-between align-items-start">
+                    <button class="btn btn-link p-0 text-start" data-coverage-detail="Meta robots, X-Robots-Tag ve canonical doğrulaması">
+                      <b>Indexlenebilirlik</b> meta robots / X-Robots / canonical
+                    </button>
+                    <span class="badge text-bg-success">Aktif</span>
+                  </li>
+                  <li class="list-group-item d-flex justify-content-between align-items-start">
+                    <button class="btn btn-link p-0 text-start" data-coverage-detail="Title/meta description uzunluk, boşluk, kopya tespiti">
+                      <b>Meta etiketler</b> title / description (boş, uzun, kopya)
+                    </button>
+                    <span class="badge text-bg-success">Aktif</span>
+                  </li>
+                  <li class="list-group-item d-flex justify-content-between align-items-start">
+                    <button class="btn btn-link p-0 text-start" data-coverage-detail="H1 var mı/tek mi ve heading hiyerarşisi">
+                      <b>Heading yapısı</b> H1 var/tek mi, hiyerarşi
+                    </button>
+                    <span class="badge text-bg-success">Aktif</span>
+                  </li>
+                  <li class="list-group-item d-flex justify-content-between align-items-start">
+                    <button class="btn btn-link p-0 text-start" data-coverage-detail="HTML lang ve hreflang var mı, dil eşleşmeleri (temel kontrol)">
+                      <b>Hreflang / html lang</b> (çok dilliler için)
+                    </button>
+                    <span class="badge text-bg-secondary">Kısmi</span>
+                  </li>
+                </ul>
+              </div>
+              <div class="col-md-6">
+                <ul class="list-group list-group-flush">
+                  <li class="list-group-item d-flex justify-content-between align-items-start">
+                    <button class="btn btn-link p-0 text-start" data-coverage-detail="Schema / JSON-LD var mı, parse hatası ve zorunlu alanlar (özet)">
+                      <b>Schema / JSON-LD</b> var mı, parse hatası
+                    </button>
+                    <span class="badge text-bg-secondary">Kısmi</span>
+                  </li>
+                  <li class="list-group-item d-flex justify-content-between align-items-start">
+                    <button class="btn btn-link p-0 text-start" data-coverage-detail="og:title/description/image ve Twitter Card temel alanları">
+                      <b>Open Graph / Twitter</b> temel alanlar
+                    </button>
+                    <span class="badge text-bg-success">Aktif</span>
+                  </li>
+                  <li class="list-group-item d-flex justify-content-between align-items-start">
+                    <button class="btn btn-link p-0 text-start" data-coverage-detail="Alt text, kırık görsel, format/weight (webp/avif), lazy-load/LCP">
+                      <b>Görsel SEO</b> alt text, kırık görsel, format/weight, lazy-load
+                    </button>
+                    <span class="badge text-bg-success">Aktif</span>
+                  </li>
+                  <li class="list-group-item d-flex justify-content-between align-items-start">
+                    <button class="btn btn-link p-0 text-start" data-coverage-detail="Thin content, duplicate/near-duplicate için özet kontrol">
+                      <b>İçerik kalite</b> thin / near-duplicate (özet)
+                    </button>
+                    <span class="badge text-bg-secondary">Kısmi</span>
+                  </li>
+                  <li class="list-group-item d-flex justify-content-between align-items-start">
+                    <button class="btn btn-link p-0 text-start" data-coverage-detail="Render-blocking kaynaklar ve temel CWV sinyalleri (LCP/CLS/INP özet)">
+                      <b>Performans</b> render-blocking / temel CWV sinyalleri
+                    </button>
+                    <span class="badge text-bg-secondary">Kısmi</span>
+                  </li>
+                  <li class="list-group-item d-flex justify-content-between align-items-start">
+                    <button class="btn btn-link p-0 text-start" data-coverage-detail="HSTS, CSP, cache-control, compression; HSTS/PHPN header eksikleri ve http assetler modalda listelenir">
+                      <b>Güvenlik başlıkları</b> HSTS, CSP, cache-control, compression
+                    </button>
+                    <span class="badge text-bg-success">Aktif</span>
+                  </li>
+                </ul>
+              </div>
+            </div>
+          </div>
+        </div>
+        {% endif %}
+
+        <div class="card shadow-sm mb-3">
+          <div class="card-body">
+            <div class="row row--tight mb-3">
+              <div>
+                <h2>Genel Özet</h2>
+                <div class="muted">Bu tarama için hızlı özet + SEO tool tarzı şemalar.</div>
+              </div>
+            </div>
+
+            <div class="row g-3 text-center align-items-start">
+              <div class="col-6 col-md-4 col-lg-2">
+                <div class="chart chart--mini">
+                  <div class="chart__title">SEO Skoru</div>
+                  <svg class="chart__svg" id="scoreDonut" viewBox="0 0 120 120" aria-label="SEO skoru donut"></svg>
+                  <div class="chart__value"><b>{{ seo_score }}%</b></div>
+                </div>
+              </div>
+              <div class="col-6 col-md-4 col-lg-2">
+                <div class="chart chart--mini">
+                  <div class="chart__title">Meta</div>
+                  <svg class="chart__svg" id="metaDonut" viewBox="0 0 120 120" aria-label="Meta donut"></svg>
+                  <div class="chart__value"><b id="metaVal">-</b></div>
+                </div>
+              </div>
+              <div class="col-6 col-md-4 col-lg-2">
+                <div class="chart chart--mini">
+                  <div class="chart__title">Başlıklar</div>
+                  <svg class="chart__svg" id="headersDonut" viewBox="0 0 120 120" aria-label="Headers donut"></svg>
+                  <div class="chart__value"><b id="headersVal">-</b></div>
+                </div>
+              </div>
+              <div class="col-6 col-md-4 col-lg-2">
+                <div class="chart chart--mini">
+                  <div class="chart__title">Görseller</div>
+                  <svg class="chart__svg" id="imagesDonut" viewBox="0 0 120 120" aria-label="Images donut"></svg>
+                  <div class="chart__value"><b id="imagesVal">-</b></div>
+                </div>
+              </div>
+              <div class="col-6 col-md-4 col-lg-2">
+                <div class="chart chart--mini">
+                  <div class="chart__title">Performans</div>
+                  <svg class="chart__svg" id="perfDonut" viewBox="0 0 120 120" aria-label="Performance donut"></svg>
+                  <div class="chart__value"><b id="perfVal">-</b></div>
+                </div>
+              </div>
+              <div class="col-6 col-md-4 col-lg-2">
+                <div class="chart">
+                  <div class="chart__title">Sorun Dağılımı</div>
+                  <svg class="chart__svg" id="issuesPie" viewBox="0 0 120 120" width="120" height="120" aria-label="Issue pie"></svg>
+                  <div class="chart__legend mx-auto" id="issuesLegend"></div>
+                </div>
+              </div>
+            </div>
+
+            {% if site_summary %}
+              <p class="summary mb-0">{{ site_summary }}</p>
+            {% endif %}
+          </div>
+        </div>
+
+        <div class="card">
+          <div class="card-body">
+            <div class="d-flex flex-wrap align-items-center gap-3">
+              <div class="flex-grow-1">
+                <h2 class="h5 mb-1">Sonuçlar</h2>
+                <div class="text-muted small">Tarama ID: <code>{{ job_id }}</code> · Başlangıç: <code>{{ job.params.get("start_url") }}</code></div>
+                <div class="mt-2">
+                  <span class="badge bg-{% if job.status == 'done' %}success{% elif job.status == 'error' %}danger{% else %}warning{% endif %}">{{ TR.status.get(job.status, job.status) }}</span>
+                  {% if job.status in ["queued","running"] %}
+                    <span class="text-muted small">Tarama devam ediyor; bu sayfa otomatik yenilenir.</span>
+                    <div class="progress mt-2" style="height:10px;">
+                      <div class="progress-bar progress-bar-striped progress-bar-animated" role="progressbar" style="width: 60%" aria-valuemin="0" aria-valuemax="100"></div>
+                    </div>
+                  {% endif %}
+                  {% if job.status == "error" %}
+                    <div class="text-danger small mt-1">Hata: {{ job.error }}</div>
+                  {% endif %}
+                  {% if job.status == "done" %}
+                    <div class="progress mt-2" style="height:10px;">
+                      <div class="progress-bar bg-success" role="progressbar" style="width: 100%" aria-valuenow="100" aria-valuemin="0" aria-valuemax="100"></div>
+                    </div>
+                  {% endif %}
+                </div>
+              </div>
+              <div class="d-flex gap-2">
+                <a class="btn btn-outline-primary btn-sm" href="/download/{{ job_id }}/issues.csv">CSV indir</a>
+                <a class="btn btn-outline-primary btn-sm" href="/download/{{ job_id }}/report.json">JSON indir</a>
+              </div>
+            </div>
+          </div>
+        </div>
+
+          {% if job.status == "done" %}
+          <div class="card shadow-sm mb-3">
+            <div class="card-body">
             <div class="row row--tight">
               <h3 style="margin:0">Checklist</h3>
               <div class="spacer"></div>
-              <button class="btn btn--ghost" type="button" id="clearChecks">Tümünü sıfırla</button>
+              <button class="btn btn-outline-secondary btn-sm" type="button" id="clearChecks">Tümünü sıfırla</button>
             </div>
 
             {% if issues_count == 0 %}
               <p>Issue bulunamadı.</p>
             {% else %}
-              <div class="checks" data-job="{{ job_id }}" id="checksWrap">
+              <div class="checks checklist" data-job="{{ job_id }}" id="checksWrap">
                 {% for it in job.issues %}
                   {% set ev = (it.evidence or "") %}
                   {% set thumb = "" %}
@@ -134,139 +265,133 @@
                   {% endif %}
                   {% set thumb_base = thumb.split("?")[0].split("#")[0].lower() %}
                   {% set is_thumb_ok = thumb and (thumb_base.endswith(".jpg") or thumb_base.endswith(".jpeg") or thumb_base.endswith(".png") or thumb_base.endswith(".webp") or thumb_base.endswith(".avif") or thumb_base.endswith(".gif") or thumb_base.endswith(".svg")) %}
-                  <label class="check" data-category="{{ it.category }}">
-                    <input type="checkbox" data-k="{{ loop.index0 }}" />
-                  {% if is_thumb_ok %}
-                    <img class="thumb" src="{{ thumb }}" alt="thumbnail" loading="lazy" />
-                  {% endif %}
-                  <span class="check__badge sev sev--{{ it.severity }}">{{ TR.severity.get(it.severity, it.severity) }}</span>
-                  <span class="check__text">
-                    <span class="check__title">{{ it.message }}</span>
-                    <span class="check__meta">
-                      <code>{{ it.category }}</code> • <code>{{ TR.issue_type.get(it.issue_type, it.issue_type) }}</code> • <code>{{ TR.field.get(it.field, it.field) }}</code> •
-                      <a href="{{ it.url }}" target="_blank" rel="noreferrer">{{ it.url }}</a>
-                      {% if it.suggestion %} • <span class="muted">{{ it.suggestion }}</span>{% endif %}
-                        {% if it.evidence %}
-                          •
-                          {% if it.evidence.startswith("http://") or it.evidence.startswith("https://") %}
-                            <a href="{{ it.evidence }}" target="_blank" rel="noreferrer">{{ it.evidence|truncate(70, True, "…") }}</a>
-                          {% elif it.evidence.startswith("data:") or it.evidence.startswith("data://") %}
-                            <span class="muted">inline veri ({{ it.evidence|length }} karakter)</span>
-                          {% else %}
-                            <span class="muted">{{ it.evidence|truncate(80, True, "…") }}</span>
+                  {% set sev = (it.severity or "").lower() %}
+                  {% set sev_class = "badge text-bg-secondary" %}
+                  {% if sev == "medium" %}{% set sev_class = "badge bg-warning text-dark" %}{% elif sev == "high" %}{% set sev_class = "badge bg-danger" %}{% endif %}
+                  <label class="check check-item d-flex gap-3 align-items-start" data-category="{{ it.category }}">
+                    <input class="form-check-input mt-1" type="checkbox" data-k="{{ loop.index0 }}" />
+                    {% if is_thumb_ok %}
+                      <img class="check-thumb" src="{{ thumb }}" alt="thumbnail" loading="lazy" />
+                    {% endif %}
+                    <div class="flex-grow-1 d-flex flex-column gap-2">
+                      <div class="d-flex align-items-center gap-2 mb-1">
+                        <span class="{{ sev_class }}">{{ TR.severity.get(it.severity, it.severity) }}</span>
+                        <span class="text-muted small">{{ TR.field.get(it.field, it.field) }}</span>
+                      </div>
+                      <div class="fw-semibold">{{ it.message }}</div>
+                      <div class="d-flex justify-content-between align-items-start gap-2 flex-wrap">
+                        <div class="check-meta">
+                          <code>{{ it.category }}</code> • <code>{{ TR.issue_type.get(it.issue_type, it.issue_type) }}</code> •
+                          <a href="{{ it.url }}" target="_blank" rel="noreferrer">{{ it.url }}</a>
+                          {% if it.suggestion %} • <span class="text-muted">{{ it.suggestion }}</span>{% endif %}
+                          {% if it.evidence %}
+                            •
+                            {% if it.evidence.startswith("http://") or it.evidence.startswith("https://") %}
+                              <a href="{{ it.evidence }}" target="_blank" rel="noreferrer">{{ it.evidence|truncate(70, True, "…") }}</a>
+                            {% elif it.evidence.startswith("data:") or it.evidence.startswith("data://") %}
+                              <span class="text-muted">inline veri ({{ it.evidence|length }} karakter)</span>
+                            {% else %}
+                              <span class="text-muted">{{ it.evidence|truncate(80, True, "…") }}</span>
+                            {% endif %}
                           {% endif %}
-                        {% endif %}
-                        • <a class="mini-link" href="/issue/{{ job_id }}/{{ loop.index0 }}">Sorunu gör</a>
-                      </span>
-                    </span>
+                        </div>
+                        <a class="mini-link mini-link--full ms-auto" href="/issue/{{ job_id }}/{{ loop.index0 }}">➜ Sorunu gör</a>
+                      </div>
+                    </div>
                   </label>
                 {% endfor %}
               </div>
             {% endif %}
           </div>
+          </div>
 
-          <div class="card">
-            <h3>Sayfa Detayları</h3>
-            {% for p in job.pages %}
-              <details class="details" {% if loop.index0 == 0 %}open{% endif %}>
-                <summary>
-                  <span class="details__title">{{ p.final_url or p.url }}</span>
-                  <span class="pill pill--muted">{{ p.status_code }}</span>
-                  {% if p.html_lang %}<span class="pill pill--muted">{{ p.html_lang }}</span>{% endif %}
-                </summary>
-                <div class="details__body">
-                  {% set purl = p.final_url or p.url %}
-                  {% if page_summaries and page_summaries.get(purl) %}
-                    <div class="page-summary">
-                      <div class="page-summary__title">Bu sayfanın genel sorunu</div>
-                      <div class="page-summary__text">{{ page_summaries.get(purl) }}</div>
+          <div class="card shadow-sm">
+            <div class="card-body">
+              <h3>Sayfa Detayları</h3>
+              <div class="accordion accordion-flush mt-3" id="pagesAccordion">
+                {% for p in job.pages %}
+                  {% set collapse_id = "page-" ~ loop.index0 %}
+                  <div class="accordion-item">
+                    <h2 class="accordion-header" id="heading-{{ collapse_id }}">
+                      <button class="accordion-button {% if loop.index0 != 0 %}collapsed{% endif %}" type="button" data-bs-toggle="collapse" data-bs-target="#{{ collapse_id }}" aria-expanded="{{ 'true' if loop.index0 == 0 else 'false' }}" aria-controls="{{ collapse_id }}">
+                        <span class="text-truncate">{{ p.final_url or p.url }}</span>
+                        <span class="badge bg-secondary ms-2">{{ p.status_code }}</span>
+                        {% if p.html_lang %}<span class="badge bg-light text-muted ms-2">{{ p.html_lang }}</span>{% endif %}
+                      </button>
+                    </h2>
+                    <div id="{{ collapse_id }}" class="accordion-collapse collapse {% if loop.index0 == 0 %}show{% endif %}" aria-labelledby="heading-{{ collapse_id }}" data-bs-parent="#pagesAccordion">
+                      <div class="accordion-body">
+                        {% set purl = p.final_url or p.url %}
+                        {% if page_summaries and page_summaries.get(purl) %}
+                          <div class="page-summary mb-3">
+                            <div class="page-summary__title">Bu sayfanın genel sorunu</div>
+                            <div class="page-summary__text">{{ page_summaries.get(purl) }}</div>
+                          </div>
+                        {% endif %}
+                        <div class="table-responsive mb-3">
+                          <table class="table table-sm align-middle mb-0">
+                            <tbody>
+                              <tr><th style="width:140px">Title</th><td>{{ p.title or "-" }}</td></tr>
+                              <tr><th>Meta desc</th><td>{{ p.meta_description or "-" }}</td></tr>
+                              <tr><th>H1</th><td>{{ p.h1 or "-" }}</td></tr>
+                              <tr><th>Canonical</th><td>{% if p.canonical %}<a href="{{ p.canonical }}" target="_blank" rel="noreferrer">{{ p.canonical }}</a>{% else %}-{% endif %}</td></tr>
+                              <tr><th>HSTS</th><td>{% if p.hsts %}<code>{{ p.hsts }}</code>{% else %}<span class="muted">yok</span>{% endif %}</td></tr>
+                            </tbody>
+                          </table>
+                        </div>
+
+                        <div class="subhead">Görseller</div>
+                        {% if not p.images %}
+                          <div class="muted">Görsel bulunamadı.</div>
+                        {% else %}
+                          <div class="table-responsive">
+                            <table class="table table-sm table-striped align-middle mb-0">
+                              <thead class="table-light">
+                                <tr>
+                                  <th style="width:120px">Alaka</th>
+                                  <th style="width:180px">Alt</th>
+                                  <th style="width:200px">Dosya Adı</th>
+                                  <th>Kaynak</th>
+                                </tr>
+                              </thead>
+                              <tbody>
+                                {% for im in p.images %}
+                                <tr class="{% if not im.alt %}row-warn{% endif %}">
+                                  <td>
+                                    {% set rel = (image_relevance.get(purl, {}) if image_relevance else {}) %}
+                                    {% set score = rel.get(im.src) %}
+                                    {% if score is number %}
+                                      <span class="pill pill--muted" title="OpenAI skoru (0-100)">{{ score }}%</span>
+                                    {% else %}
+                                      <span class="text-muted">-</span>
+                                    {% endif %}
+                                  </td>
+                                  <td>{% if im.alt %}{{ im.alt }}{% else %}<span class="text-muted">Eksik</span>{% endif %}</td>
+                                  <td><code>{{ im.filename or "-" }}</code></td>
+                                  <td class="url">
+                                    {% if im.src.startswith("data:") or im.src.startswith("data://") %}
+                                      <span class="text-muted">inline veri ({{ im.src|length }} karakter)</span>
+                                    {% else %}
+                                      <a href="{{ im.src }}" target="_blank" rel="noreferrer" title="{{ im.src }}">{{ im.src|truncate(90, True, "…") }}</a>
+                                    {% endif %}
+                                  </td>
+                                </tr>
+                                {% endfor %}
+                              </tbody>
+                            </table>
+                          </div>
+                        {% endif %}
+                      </div>
                     </div>
-                  {% endif %}
-                  <div class="kv">
-                    <div class="kv__k">Title</div>
-                    <div class="kv__v">{{ p.title or "-" }}</div>
-                    <div class="kv__k">Meta desc</div>
-                    <div class="kv__v">{{ p.meta_description or "-" }}</div>
-                    <div class="kv__k">H1</div>
-                    <div class="kv__v">{{ p.h1 or "-" }}</div>
-                    <div class="kv__k">Canonical</div>
-                    <div class="kv__v">{% if p.canonical %}<a href="{{ p.canonical }}" target="_blank" rel="noreferrer">{{ p.canonical }}</a>{% else %}-{% endif %}</div>
-                    <div class="kv__k">HSTS</div>
-                    <div class="kv__v">{% if p.hsts %}<code>{{ p.hsts }}</code>{% else %}<span class="muted">missing</span>{% endif %}</div>
                   </div>
-
-                  <div class="subhead">Görseller</div>
-                  {% if not p.images %}
-                    <div class="muted">Görsel bulunamadı.</div>
-                  {% else %}
-                    <div class="table-wrap">
-                      <table class="table table--compact table--fixed">
-                        <thead>
-                          <tr>
-                            <th style="width:120px">Alaka</th>
-                            <th style="width:180px">Alt</th>
-                            <th style="width:220px">Filename</th>
-                            <th>Src</th>
-                          </tr>
-                        </thead>
-                        <tbody>
-                          {% for im in p.images %}
-                          <tr class="{% if not im.alt %}row-warn{% endif %}">
-                            <td class="cell-clip">
-                              {% set rel = (image_relevance.get(purl, {}) if image_relevance else {}) %}
-                              {% set score = rel.get(im.src) %}
-                              {% if score is number %}
-                                <span class="pill pill--muted" title="OpenAI skoru (0-100)">{{ score }}%</span>
-                              {% else %}
-                                <span class="muted">-</span>
-                              {% endif %}
-                            </td>
-                            <td class="cell-clip">{% if im.alt %}{{ im.alt }}{% else %}<span class="muted">EKSİK</span>{% endif %}</td>
-                            <td class="cell-clip"><code>{{ im.filename or "-" }}</code></td>
-                            <td class="url cell-clip">
-                              {% if im.src.startswith("data:") or im.src.startswith("data://") %}
-                                <span class="muted">inline veri ({{ im.src|length }} karakter)</span>
-                              {% else %}
-                                <a href="{{ im.src }}" target="_blank" rel="noreferrer" title="{{ im.src }}">{{ im.src|truncate(90, True, "…") }}</a>
-                              {% endif %}
-                            </td>
-                          </tr>
-                          {% endfor %}
-                        </tbody>
-                      </table>
-                    </div>
-                  {% endif %}
-                </div>
-              </details>
-            {% endfor %}
+                {% endfor %}
+              </div>
+            </div>
           </div>
         {% endif %}
       {% endif %}
     </main>
 
-    <aside class="side">
-      <div class="card">
-        <h3>Önceki Taramalar</h3>
-        {% if not jobs %}
-          <p class="muted">Henüz tarama yok.</p>
-        {% else %}
-          <div class="jobs">
-            {% for j in jobs %}
-              <a class="job {% if j.id == job_id %}job--active{% endif %}" href="/results/{{ j.id }}">
-                <div class="job__row">
-                  <span class="pill pill--{{ j.status }}">{{ TR.status.get(j.status, j.status) }}</span>
-                  <span class="job__id">{{ j.id }}</span>
-                </div>
-                <div class="job__meta">
-                  <div class="job__url">{{ (j.params.get("start_url") or "")|truncate(60, True, "…") }}</div>
-                  <div class="muted">{{ (j.params.get("mode") or "") }} • {{ (j.params.get("fetcher") or "") }}</div>
-                </div>
-              </a>
-            {% endfor %}
-          </div>
-        {% endif %}
-      </div>
-    </aside>
   </div>
 
   <script>
@@ -457,4 +582,293 @@
       }
     })();
   </script>
+  {% if job and job.status == "done" %}
+  <script>
+    (function () {
+      const pieEl = document.getElementById("secPie");
+      const secModalEl = document.getElementById("secModal");
+      let securityData = null;
+
+      function renderSecurity(data) {
+        const missingEl = document.getElementById("missingHeaders");
+          const insecureEl = document.getElementById("insecureAssets");
+          const originsEl = document.getElementById("assetOrigins");
+          const passedEl = document.getElementById("passedHeaders");
+          const cssCount = document.getElementById("cssCount");
+          const jsCount = document.getElementById("jsCount");
+          const imgCount = document.getElementById("imgCount");
+        const secAlert = document.getElementById("secAlert");
+        const secError = document.getElementById("secError");
+
+        if (!data || data.error) {
+          if (secError) {
+            secError.classList.remove("d-none");
+            secError.textContent = "Güvenlik kontrolü başarısız: " + (data?.error || "bilinmiyor");
+          }
+          if (secAlert) {
+            secAlert.classList.remove("d-none");
+            secAlert.textContent = "HSTS/başlık raporu alınamadı. URL erişilebilir mi kontrol edin.";
+          }
+          return;
+        }
+
+        const missing = data.missing_headers || [];
+        const totalHeaders = {{ SECURITY_HEADERS|length if SECURITY_HEADERS is defined else 6 }};
+        const present = totalHeaders - missing.length;
+        const insecureAssets = data.insecure_assets || [];
+        const headerNames = {{ SECURITY_HEADERS|tojson if SECURITY_HEADERS is defined else "[]" }};
+
+        if (pieEl) {
+          new Chart(pieEl, {
+            type: "pie",
+            data: {
+              labels: ["Mevcut", "Eksik"],
+              datasets: [
+                {
+                  data: [Math.max(0, present), Math.max(0, missing.length)],
+                  backgroundColor: ["#16a34a", "#ef4444"],
+                },
+              ],
+            },
+            options: { plugins: { legend: { position: "bottom" } } },
+          });
+        }
+
+        if (missingEl) {
+          missingEl.innerHTML = "";
+          if (!missing.length) {
+            missingEl.innerHTML = '<li class="list-group-item text-success">Eksik başlık yok.</li>';
+          } else {
+            missingEl.innerHTML = missing
+              .map(
+                (h) =>
+                  `<li class="list-group-item d-flex justify-content-between align-items-center"><span>${h}</span><span class="badge text-bg-danger">eksik</span></li>`,
+              )
+              .join("");
+          }
+        }
+
+        if (insecureEl) {
+          insecureEl.innerHTML = "";
+          if (!insecureAssets.length) {
+            insecureEl.innerHTML = '<li class="list-group-item text-success">Tüm assetler https.</li>';
+          } else {
+            insecureAssets.slice(0, 50).forEach((a) => {
+              const li = document.createElement("li");
+              li.className = "list-group-item small";
+              if (a.startsWith("http")) {
+                li.innerHTML = `<a href="${a}" target="_blank" rel="noreferrer">${a}</a>`;
+              } else {
+                li.textContent = a;
+              }
+              insecureEl.appendChild(li);
+            });
+            if (insecureAssets.length > 50) {
+              const li = document.createElement("li");
+              li.className = "list-group-item text-muted";
+              li.textContent = `+${insecureAssets.length - 50} daha...`;
+              insecureEl.appendChild(li);
+            }
+          }
+        }
+
+        if (passedEl) {
+          passedEl.innerHTML = "";
+          const presentList = headerNames.filter((h) => !missing.includes(h));
+          if (!presentList.length) {
+            passedEl.innerHTML = '<li class="list-group-item text-muted">Geçen başlık yok.</li>';
+          } else {
+            presentList.forEach((h) => {
+              const li = document.createElement("li");
+              li.className = "list-group-item d-flex align-items-center gap-2 text-success";
+              li.innerHTML = `<i class="fa fa-check-circle"></i><span>${h}</span>`;
+              passedEl.appendChild(li);
+            });
+          }
+        }
+
+        if (originsEl) {
+          originsEl.innerHTML = "";
+          const origins = data.asset_origins || {};
+          const external = origins.external || [];
+          const internal = origins.internal || [];
+          if (!external.length) {
+            originsEl.innerHTML = '<li class="list-group-item text-success">Harici asset kaynağı yok.</li>';
+          } else {
+            external.slice(0, 50).forEach((o) => {
+              const li = document.createElement("li");
+              li.className = "list-group-item d-flex justify-content-between align-items-start";
+              const types = (o.types || []).join(", ");
+              li.innerHTML = `<div><div class="fw-semibold">${o.host}</div><small class="text-muted">${types}</small></div><span class="badge text-bg-warning">${o.count}</span>`;
+              originsEl.appendChild(li);
+            });
+            if (external.length > 50) {
+              const li = document.createElement("li");
+              li.className = "list-group-item text-muted";
+              li.textContent = `+${external.length - 50} daha...`;
+              originsEl.appendChild(li);
+            }
+          }
+          if (internal.length) {
+            const sep = document.createElement("li");
+            sep.className = "list-group-item text-muted";
+            sep.textContent = "İç (geçen) kaynaklar";
+            originsEl.appendChild(sep);
+            internal.slice(0, 50).forEach((o) => {
+              const li = document.createElement("li");
+              li.className = "list-group-item d-flex justify-content-between align-items-start";
+              const types = (o.types || []).join(", ");
+              li.innerHTML = `<div><div class="fw-semibold">${o.host}</div><small class="text-muted">${types}</small></div><span class="badge text-bg-success">${o.count}</span>`;
+              originsEl.appendChild(li);
+            });
+          }
+        }
+
+        if (cssCount) cssCount.textContent = `${(data.assets?.css || []).length} CSS linki`;
+        if (jsCount) jsCount.textContent = `${(data.assets?.js || []).length} JS dosyası`;
+        if (imgCount) imgCount.textContent = `${(data.assets?.img || []).length} görsel`;
+
+        if (secAlert) secAlert.classList.add("d-none");
+        if (secError) secError.classList.add("d-none");
+      }
+
+      function fetchSecurity() {
+        return fetch("/security/{{ job_id }}/report")
+          .then((r) => r.json())
+          .then((data) => {
+            console.log("SECURITY_REPORT", data);
+            securityData = data;
+            renderSecurity(data);
+          })
+          .catch((err) => {
+            const secError = document.getElementById("secError");
+            const secAlert = document.getElementById("secAlert");
+            if (secError) {
+              secError.classList.remove("d-none");
+              secError.textContent = "Güvenlik kontrolü başarısız: " + err;
+            }
+            if (secAlert) {
+              secAlert.classList.remove("d-none");
+              secAlert.textContent = "HSTS/başlık raporu alınamadı. URL erişilebilir mi kontrol edin.";
+            }
+          });
+      }
+
+      // Fetch once after DOM ready (script is already at page bottom)
+      fetchSecurity();
+
+      // Re-render when modal opens (in case DOM rebuilt)
+      if (secModalEl) {
+        secModalEl.addEventListener("show.bs.modal", () => {
+          if (securityData) {
+            renderSecurity(securityData);
+          } else {
+            fetchSecurity();
+          }
+        });
+      }
+
+      // Coverage detail modal
+      const coverageBtns = document.querySelectorAll("[data-coverage-detail]");
+      const covModalEl = document.getElementById("coverageModal");
+      const covTitle = document.getElementById("coverageTitle");
+      const covBody = document.getElementById("coverageBody");
+      let covModal;
+      if (covModalEl) {
+        covModal = new bootstrap.Modal(covModalEl);
+      }
+      coverageBtns.forEach((btn) => {
+        btn.addEventListener("click", () => {
+          const text = btn.getAttribute("data-coverage-detail") || "";
+          const heading = btn.textContent?.trim() || "Detay";
+          if (covTitle) covTitle.textContent = heading;
+          if (covBody) {
+            covBody.innerHTML = text.replace(/\\n/g, "<br>");
+          }
+          if (covModal) covModal.show();
+        });
+      });
+    })();
+  </script>
+  {% endif %}
+{% endblock %}
+
+{% block extra_modals %}
+<div class="modal fade" id="secModal" tabindex="-1" aria-hidden="true">
+  <div class="modal-dialog modal-lg modal-dialog-scrollable">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title">Güvenlik Başlıkları ve Asset Kontrolü</h5>
+          <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Kapat"></button>
+        </div>
+        <div class="modal-body">
+          <div id="secAlert" class="alert alert-info py-2 d-none"></div>
+          <div id="secError" class="alert alert-danger py-2 d-none"></div>
+          <div class="mb-3">
+            <h6>Eksik Başlıklar</h6>
+            <ul class="list-group" id="missingHeaders"></ul>
+          </div>
+          <div class="mb-3">
+            <h6>Geçen Başlıklar</h6>
+            <ul class="list-group" id="passedHeaders"></ul>
+          </div>
+          <div class="mb-3">
+            <h6>Güvenli olmayan assetler (http://)</h6>
+            <ul class="list-group" id="insecureAssets"></ul>
+          </div>
+          <div class="mb-3">
+            <h6>Harici asset kaynakları (permissions-policy için kaynaklar)</h6>
+            <ul class="list-group" id="assetOrigins"></ul>
+          </div>
+          <div class="mb-3">
+            <h6>Toplanan linkler</h6>
+            <div class="row g-2">
+              <div class="col-md-4">
+                <div class="card">
+                  <div class="card-body">
+                    <div class="fw-semibold mb-1">CSS</div>
+                    <small id="cssCount" class="text-muted"></small>
+                  </div>
+                </div>
+              </div>
+              <div class="col-md-4">
+                <div class="card">
+                  <div class="card-body">
+                    <div class="fw-semibold mb-1">JS</div>
+                    <small id="jsCount" class="text-muted"></small>
+                  </div>
+                </div>
+              </div>
+              <div class="col-md-4">
+                <div class="card">
+                  <div class="card-body">
+                    <div class="fw-semibold mb-1">IMG</div>
+                    <small id="imgCount" class="text-muted"></small>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Kapat</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="modal fade" id="coverageModal" tabindex="-1" aria-hidden="true">
+  <div class="modal-dialog modal-dialog-centered">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title" id="coverageTitle">Detay</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Kapat"></button>
+      </div>
+      <div class="modal-body" id="coverageBody"></div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Kapat</button>
+      </div>
+    </div>
+  </div>
+</div>
 {% endblock %}

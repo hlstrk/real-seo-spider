@@ -1,13 +1,17 @@
 from __future__ import annotations
 
 import dataclasses
+import hashlib
+import hmac
 import json
 import os
 import runpy
+import secrets
 import threading
 import time
 import uuid
 from dataclasses import dataclass
+from datetime import datetime
 from pathlib import Path
 from typing import Any, Dict, List, Optional
 
@@ -16,6 +20,10 @@ from fastapi import HTTPException
 from fastapi.responses import FileResponse, HTMLResponse, RedirectResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
+from slowapi import Limiter, _rate_limit_exceeded_handler
+from slowapi.errors import RateLimitExceeded
+from slowapi.middleware import SlowAPIMiddleware
+from slowapi.util import get_remote_address
 from starlette.middleware.sessions import SessionMiddleware
 
 import seo_audit
@@ -37,27 +45,58 @@ class Job:
     out_dir: str = ""
 
 
+@dataclass
+class User:
+    username: str
+    password_hash: str
+    salt: str
+    role: str = "user"
+
+
 BASE_DIR = Path(__file__).resolve().parent
 TEMPLATES_DIR = BASE_DIR / "templates"
 STATIC_DIR = BASE_DIR / "static"
 OUT_DIR = Path("out") / "web"
 JOBS_DB_PATH = OUT_DIR / "jobs.json"
+USERS_DB_PATH = OUT_DIR / "users.json"
+SETTINGS_PATH = OUT_DIR / "settings.json"
 SHOTS_DIRNAME = "shots"
 
-# Auth (very simple, local use). Change these if needed.
-ADMIN_USERNAME = "lema"
-ADMIN_PASSWORD = "1234"
+DEFAULT_RATE_LIMIT = os.getenv("WEBAPP_RATE_LIMIT", "60/minute")
+LOGIN_RATE_LIMIT = os.getenv("WEBAPP_LOGIN_RATE_LIMIT", "5/minute")
+SCAN_RATE_LIMIT = os.getenv("WEBAPP_SCAN_RATE_LIMIT", "10/hour")
+ADMIN_RATE_LIMIT = os.getenv("WEBAPP_ADMIN_RATE_LIMIT", "20/hour")
+SESSION_SECRET = os.getenv("WEBAPP_SESSION_SECRET") or secrets.token_hex(32)
+DEFAULT_MAX_PAGES_LIMIT = int(os.getenv("WEBAPP_MAX_PAGES_LIMIT", "200"))
+DEFAULT_MAX_PAGES_DEFAULT = int(os.getenv("WEBAPP_MAX_PAGES_DEFAULT", "50"))
 
-# OpenAI API key: do NOT ask for it in the UI. Paste it here or set env var OPENAI_API_KEY.
-# Prefer env var for safety.
-OPENAI_API_KEY_OVERRIDE = ""
+# Auth (very simple, local use). Configure via env vars for safety.
+ADMIN_USERNAME = os.getenv("WEBAPP_ADMIN_USERNAME", "lema")
+ADMIN_PASSWORD = (os.getenv("WEBAPP_ADMIN_PASSWORD") or os.getenv("ADMIN_PASSWORD") or "").strip()
+ADMIN_PASSWORD_SET = bool(ADMIN_PASSWORD)
 
-app = FastAPI(title="real-seo-spider web")
+app = FastAPI(title="SEO Pulse")
+limiter = Limiter(key_func=get_remote_address, default_limits=[DEFAULT_RATE_LIMIT])
+app.state.limiter = limiter
+app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
+app.add_middleware(SlowAPIMiddleware)
+app.add_middleware(
+    SessionMiddleware,
+    secret_key=SESSION_SECRET,
+    same_site="lax",
+)
 app.mount("/static", StaticFiles(directory=str(STATIC_DIR)), name="static")
 templates = Jinja2Templates(directory=str(TEMPLATES_DIR))
+templates.env.filters["fmt_dt"] = lambda ts: datetime.fromtimestamp(float(ts)).strftime("%Y-%m-%d %H:%M")
 
 JOBS: Dict[str, Job] = {}
 JOBS_LOCK = threading.Lock()
+USERS: Dict[str, User] = {}
+USERS_LOCK = threading.Lock()
+SETTINGS: Dict[str, int] = {
+    "max_pages_limit": max(1, DEFAULT_MAX_PAGES_LIMIT),
+    "max_pages_default": max(1, min(DEFAULT_MAX_PAGES_DEFAULT, DEFAULT_MAX_PAGES_LIMIT)),
+}
 
 TR: Dict[str, Any] = {
     "status": {"queued": "sırada", "running": "çalışıyor", "done": "tamamlandı", "error": "hata"},
@@ -114,22 +153,216 @@ TR: Dict[str, Any] = {
 }
 templates.env.globals["TR"] = TR
 
-app.add_middleware(
-    SessionMiddleware,
-    secret_key=os.getenv("WEBAPP_SESSION_SECRET", "dev-secret-change-me"),
-    same_site="lax",
-)
+SECURITY_HEADERS = [
+    "strict-transport-security",
+    "content-security-policy",
+    "x-content-type-options",
+    "referrer-policy",
+    "permissions-policy",
+    "x-frame-options",
+]
 
+
+def _hash_password(password: str, salt_hex: Optional[str] = None) -> tuple[str, str]:
+    if not password:
+        raise ValueError("Password required")
+    salt_hex = salt_hex or secrets.token_hex(16)
+    try:
+        salt_bytes = bytes.fromhex(salt_hex)
+    except ValueError as exc:
+        raise ValueError("Invalid salt") from exc
+    digest = hashlib.pbkdf2_hmac("sha256", password.encode("utf-8"), salt_bytes, 120_000)
+    return salt_hex, digest.hex()
+
+
+def _verify_password(password: str, user: User) -> bool:
+    try:
+        salt_bytes = bytes.fromhex(user.salt)
+        digest = hashlib.pbkdf2_hmac("sha256", password.encode("utf-8"), salt_bytes, 120_000)
+        return hmac.compare_digest(user.password_hash, digest.hex())
+    except Exception:
+        return False
+
+
+def _save_users_db() -> None:
+    USERS_DB_PATH.parent.mkdir(parents=True, exist_ok=True)
+    with USERS_LOCK:
+        payload = {"users": [dataclasses.asdict(u) for u in USERS.values()]}
+    USERS_DB_PATH.write_text(json.dumps(payload, ensure_ascii=False, indent=2), encoding="utf-8")
+
+
+def _ensure_default_admin() -> None:
+    if not ADMIN_PASSWORD_SET:
+        return
+    username = ADMIN_USERNAME or "admin"
+    created = False
+    with USERS_LOCK:
+        if username not in USERS:
+            salt, pw_hash = _hash_password(ADMIN_PASSWORD)
+            USERS[username] = User(username=username, password_hash=pw_hash, salt=salt, role="admin")
+            created = True
+    if created:
+        _save_users_db()
+
+
+def _load_users_db() -> None:
+    if USERS_DB_PATH.exists():
+        try:
+            data = json.loads(USERS_DB_PATH.read_text(encoding="utf-8"))
+            items = data.get("users", [])
+            with USERS_LOCK:
+                USERS.clear()
+                for it in items:
+                    u = User(
+                        username=str(it.get("username") or ""),
+                        password_hash=str(it.get("password_hash") or ""),
+                        salt=str(it.get("salt") or ""),
+                        role=str(it.get("role") or "user"),
+                    )
+                    if u.username and u.password_hash and u.salt:
+                        USERS[u.username] = u
+        except Exception:
+            with USERS_LOCK:
+                USERS.clear()
+    _ensure_default_admin()
+
+
+def _get_user(username: str) -> Optional[User]:
+    with USERS_LOCK:
+        return USERS.get(username)
+
+
+def _create_user(username: str, password: str, role: str = "user") -> None:
+    username = username.strip()
+    if not username or len(username) < 3:
+        raise ValueError("Username must be at least 3 characters.")
+    if not password or len(password) < 8:
+        raise ValueError("Password must be at least 8 characters.")
+    if role not in ("admin", "user"):
+        raise ValueError("Role must be admin or user.")
+    with USERS_LOCK:
+        if username in USERS:
+            raise ValueError("User already exists.")
+    salt, pw_hash = _hash_password(password)
+    with USERS_LOCK:
+        USERS[username] = User(username=username, password_hash=pw_hash, salt=salt, role=role)
+    _save_users_db()
+
+
+def _reset_password(username: str, password: str) -> None:
+    if not password or len(password) < 8:
+        raise ValueError("Password must be at least 8 characters.")
+    with USERS_LOCK:
+        user = USERS.get(username)
+    if not user:
+        raise ValueError("User not found.")
+    salt, pw_hash = _hash_password(password)
+    with USERS_LOCK:
+        user.salt = salt
+        user.password_hash = pw_hash
+    _save_users_db()
+
+
+def _load_settings() -> None:
+    try:
+        data = json.loads(SETTINGS_PATH.read_text(encoding="utf-8"))
+        limit = int(data.get("max_pages_limit") or SETTINGS["max_pages_limit"])
+        default = int(data.get("max_pages_default") or SETTINGS["max_pages_default"])
+        SETTINGS["max_pages_limit"] = max(1, limit)
+        SETTINGS["max_pages_default"] = max(1, min(default, SETTINGS["max_pages_limit"]))
+    except Exception:
+        SETTINGS["max_pages_limit"] = max(1, SETTINGS["max_pages_limit"])
+        SETTINGS["max_pages_default"] = max(1, min(SETTINGS["max_pages_default"], SETTINGS["max_pages_limit"]))
+
+
+def _save_settings() -> None:
+    SETTINGS_PATH.parent.mkdir(parents=True, exist_ok=True)
+    SETTINGS_PATH.write_text(json.dumps(SETTINGS, ensure_ascii=False, indent=2), encoding="utf-8")
+
+
+def _fetch_security_report(url: str, timeout: int = 10) -> Dict[str, Any]:
+    import requests
+    from bs4 import BeautifulSoup  # type: ignore
+    from urllib.parse import urlparse, urljoin
+
+    report: Dict[str, Any] = {
+        "url": url,
+        "headers": {},
+        "missing_headers": [],
+        "assets": {"css": [], "js": [], "img": []},
+        "insecure_assets": [],
+        "asset_origins": {"internal": [], "external": []},
+    }
+    try:
+        parsed = urlparse(url)
+        origin_host = (parsed.hostname or "").lower()
+        origin_scheme = parsed.scheme or "https"
+
+        def _normalize_link(link: str) -> str:
+            if not link:
+                return ""
+            if link.startswith("//"):
+                return f"{origin_scheme}:{link}"
+            if link.startswith("http://") or link.startswith("https://"):
+                return link
+            # relative
+            return urljoin(f"{origin_scheme}://{origin_host}", link)
+
+        resp = requests.get(url, timeout=timeout, allow_redirects=True)
+        report["headers"] = {k.lower(): v for k, v in resp.headers.items()}
+
+        missing = []
+        for h in SECURITY_HEADERS:
+            if h not in report["headers"]:
+                missing.append(h)
+        report["missing_headers"] = missing
+
+        content_type = resp.headers.get("content-type", "")
+        if "html" in content_type and resp.text:
+            soup = BeautifulSoup(resp.text, "html.parser")
+            css_links = [link.get("href") or "" for link in soup.find_all("link", rel=lambda v: v and "stylesheet" in v)]
+            js_links = [script.get("src") or "" for script in soup.find_all("script") if script.get("src")]
+            img_links = [img.get("src") or "" for img in soup.find_all("img") if img.get("src")]
+            report["assets"]["css"] = css_links
+            report["assets"]["js"] = js_links
+            report["assets"]["img"] = img_links
+            all_assets = css_links + js_links + img_links
+            report["insecure_assets"] = [a for a in all_assets if a.startswith("http://")]
+
+            origins: Dict[str, Dict[str, Any]] = {}
+            for kind, links in (("css", css_links), ("js", js_links), ("img", img_links)):
+                for lk in links:
+                    norm = _normalize_link(lk)
+                    host = (urlparse(norm).hostname or "").lower()
+                    key = host or "(bilinmiyor)"
+                    entry = origins.setdefault(
+                        key,
+                        {"host": key, "count": 0, "types": set(), "sample": norm or lk},
+                    )
+                    entry["count"] += 1
+                    entry["types"].add(kind)
+            external = []
+            internal = []
+            for entry in origins.values():
+                entry["types"] = sorted(entry["types"])
+                if entry["host"] == origin_host or not entry["host"]:
+                    internal.append(entry)
+                else:
+                    external.append(entry)
+            external_sorted = sorted(external, key=lambda x: (-x["count"], x["host"]))
+            internal_sorted = sorted(internal, key=lambda x: (-x["count"], x["host"]))
+            report["asset_origins"] = {
+                "external": external_sorted,
+                "internal": internal_sorted,
+            }
+    except Exception as e:
+        report["error"] = str(e)
+    return report
 
 def _load_openai_key_from_files() -> str:
     # Priority:
-    # 1) OPENAI_API_KEY_OVERRIDE in this file
-    # 2) env var OPENAI_API_KEY
-    # 3) config.py (recommended)
-    # 4) config.example.py (fallback, user requested)
-    if OPENAI_API_KEY_OVERRIDE.strip():
-        return OPENAI_API_KEY_OVERRIDE.strip()
-
+    # 1) env var OPENAI_API_KEY (recommended)
+    # 2) config.py (local, not committed)
     env_key = os.getenv("OPENAI_API_KEY", "").strip()
     if env_key:
         return env_key
@@ -142,13 +375,7 @@ def _load_openai_key_from_files() -> str:
             return key
     except Exception:
         pass
-
-    try:
-        cfg = runpy.run_path(str(Path("config.example.py").resolve()))
-        key = str(cfg.get("OPENAI_API_KEY", "") or "").strip()
-        return key
-    except Exception:
-        return ""
+    return ""
 
 
 def _load_openai_model_from_files() -> str:
@@ -171,13 +398,27 @@ def _load_openai_model_from_files() -> str:
         return ""
 
 
+def _current_user(request: Request) -> Optional[User]:
+    username = str(request.session.get("username") or "").strip()
+    if not username:
+        return None
+    return _get_user(username)
+
+
 def _is_logged_in(request: Request) -> bool:
-    return bool(request.session.get("auth") == "ok")
+    return _current_user(request) is not None
 
 
 def _require_login(request: Request) -> None:
     if not _is_logged_in(request):
         raise HTTPException(status_code=401, detail="Not authenticated")
+
+
+def _require_admin(request: Request) -> User:
+    user = _current_user(request)
+    if not user or user.role != "admin":
+        raise HTTPException(status_code=403, detail="Admin required")
+    return user
 
 
 def _load_jobs_db() -> None:
@@ -238,10 +479,11 @@ def _run_job(job_id: str) -> None:
         timeout = int(p["timeout"])
         use_sitemap = bool(p.get("use_sitemap"))
         follow_redirects = bool(p.get("follow_redirects"))
-        no_gpt = bool(p.get("no_gpt"))
+        no_gpt_requested = bool(p.get("no_gpt"))
         sleep = float(p.get("sleep") or 0)
         model = str(p.get("model") or (_load_openai_model_from_files() or "gpt-4o-mini"))
         api_key = _load_openai_key_from_files()
+        use_gpt = bool(api_key) and not no_gpt_requested
 
         # Default to chromium for Cloudflare-protected pages.
         if fetcher not in ("chromium", "requests"):
@@ -280,7 +522,7 @@ def _run_job(job_id: str) -> None:
         site_summary = ""
         page_summaries: Dict[str, str] = {}
         image_relevance: Dict[str, Dict[str, int]] = {}
-        if not no_gpt and api_key:
+        if use_gpt:
             issues.extend(seo_audit.gpt_issues(pages, api_key=api_key, model=model, sleep_seconds=sleep))
             try:
                 summ = seo_audit.gpt_summaries(pages, issues, api_key=api_key, model=model)
@@ -340,23 +582,70 @@ def _jobs_list() -> List[Job]:
 
 
 _load_jobs_db()
+_load_users_db()
+_load_settings()
+
+
+def _render_admin(
+    request: Request, message: str = "", error: str = "", status_code: int = 200
+) -> HTMLResponse:
+    _require_admin(request)
+    with USERS_LOCK:
+        users_list = sorted(
+            [{"username": u.username, "role": u.role} for u in USERS.values()],
+            key=lambda u: (u["role"] != "admin", u["username"]),
+        )
+    return templates.TemplateResponse(
+        "admin.html",
+        {
+            "request": request,
+            "users": users_list,
+            "message": message,
+            "error": error,
+            "settings": SETTINGS,
+        },
+        status_code=status_code,
+    )
 
 
 @app.get("/login", response_class=HTMLResponse)
 def login_get(request: Request) -> HTMLResponse:
     if _is_logged_in(request):
         return RedirectResponse(url="/", status_code=303)
+    if not USERS:
+        return templates.TemplateResponse(
+            "login.html",
+            {
+                "request": request,
+                "error": "Admin hesabı yok. WEBAPP_ADMIN_PASSWORD ile bir admin oluşturup uygulamayı yeniden başlatın.",
+            },
+            status_code=503,
+        )
     return templates.TemplateResponse("login.html", {"request": request, "error": ""})
 
 
 @app.post("/login")
+@limiter.limit(LOGIN_RATE_LIMIT)
 def login_post(
     request: Request,
     username: str = Form(""),
     password: str = Form(""),
 ):
-    if username == ADMIN_USERNAME and password == ADMIN_PASSWORD:
+    if not USERS:
+        return templates.TemplateResponse(
+            "login.html",
+            {
+                "request": request,
+                "error": "Admin hesabı yok. WEBAPP_ADMIN_PASSWORD ile bir admin oluşturup uygulamayı yeniden başlatın.",
+            },
+            status_code=503,
+        )
+    user = _get_user(username)
+    if user and _verify_password(password, user):
+        request.session.clear()
         request.session["auth"] = "ok"
+        request.session["username"] = user.username
+        request.session["role"] = user.role
         return RedirectResponse(url="/", status_code=303)
     return templates.TemplateResponse("login.html", {"request": request, "error": "Hatalı kullanıcı adı veya şifre."})
 
@@ -367,10 +656,61 @@ def logout(request: Request) -> RedirectResponse:
     return RedirectResponse(url="/login", status_code=303)
 
 
+@app.get("/admin", response_class=HTMLResponse)
+def admin_panel(request: Request) -> HTMLResponse:
+    return _render_admin(request)
+
+
+@app.post("/admin/users")
+@limiter.limit(ADMIN_RATE_LIMIT)
+def admin_users(
+    request: Request,
+    action: str = Form(...),
+    username: str = Form(""),
+    password: str = Form(""),
+    role: str = Form("user"),
+) -> HTMLResponse:
+    try:
+        _require_admin(request)
+        if action == "create":
+            _create_user(username, password, role)
+            return _render_admin(request, message=f"Kullanıcı oluşturuldu: {username.strip()}")
+        if action == "reset":
+            _reset_password(username, password)
+            return _render_admin(request, message=f"Şifre güncellendi: {username.strip()}")
+        raise ValueError("Geçersiz işlem.")
+    except Exception as e:
+        return _render_admin(request, error=str(e), status_code=400)
+
+
+@app.post("/admin/settings")
+@limiter.limit(ADMIN_RATE_LIMIT)
+def admin_settings(
+    request: Request,
+    max_pages_limit: int = Form(...),
+    max_pages_default: int = Form(...),
+) -> HTMLResponse:
+    _require_admin(request)
+    try:
+        limit_val = max(1, min(int(max_pages_limit), 2000))
+        default_val = max(1, min(int(max_pages_default), limit_val))
+        SETTINGS["max_pages_limit"] = limit_val
+        SETTINGS["max_pages_default"] = default_val
+        _save_settings()
+        return _render_admin(request, message="Ayarlar güncellendi.")
+    except Exception as e:
+        return _render_admin(request, error=str(e), status_code=400)
+
+
 @app.get("/", response_class=HTMLResponse)
 def index(request: Request) -> HTMLResponse:
     if not _is_logged_in(request):
-        return RedirectResponse(url="/login", status_code=303)
+        return templates.TemplateResponse(
+            "landing.html",
+            {
+                "request": request,
+            },
+        )
     return templates.TemplateResponse(
         "index.html",
         {
@@ -383,7 +723,7 @@ def index(request: Request) -> HTMLResponse:
                 "fetcher": "chromium",
                 "scope_prefixes": "/",
                 "require_lang": "en",
-                "max_pages": "50",
+                "max_pages": str(SETTINGS["max_pages_default"]),
                 "timeout": "30",
                 "use_sitemap": False,
                 "follow_redirects": False,
@@ -391,11 +731,13 @@ def index(request: Request) -> HTMLResponse:
                 "sleep": "0",
                 "model": (_load_openai_model_from_files() or "gpt-4o-mini"),
             },
+            "max_pages_limit": SETTINGS["max_pages_limit"],
         },
     )
 
 
 @app.post("/scan")
+@limiter.limit(SCAN_RATE_LIMIT)
 def start_scan(
     request: Request,
     start_url: str = Form(...),
@@ -414,6 +756,11 @@ def start_scan(
 ) -> RedirectResponse:
     if not _is_logged_in(request):
         return RedirectResponse(url="/login", status_code=303)
+    try:
+        max_pages_val = max(1, min(int(max_pages), SETTINGS["max_pages_limit"]))
+    except Exception:
+        max_pages_val = SETTINGS["max_pages_default"]
+
     job_id = _new_job_id()
     out_dir = str(OUT_DIR / job_id)
     job = Job(
@@ -427,7 +774,7 @@ def start_scan(
             "fetcher": fetcher,
             "scope_prefixes": scope_prefixes,
             "require_lang": require_lang,
-            "max_pages": max_pages,
+            "max_pages": max_pages_val,
             "timeout": timeout,
             "use_sitemap": use_sitemap,
             "follow_redirects": follow_redirects,
@@ -508,6 +855,7 @@ def results(request: Request, job_id: str) -> HTMLResponse:
             "page_summaries": dict(getattr(job, "page_summaries", {}) or {}),
             "image_relevance": dict(getattr(job, "image_relevance", {}) or {}),
             "donuts": donuts,
+            "SECURITY_HEADERS": SECURITY_HEADERS,
         },
     )
 
@@ -772,3 +1120,19 @@ def download(request: Request, job_id: str, name: str) -> FileResponse:
     if not path.exists():
         raise HTTPException(status_code=404, detail="File not found")
     return FileResponse(path=str(path), filename=name)
+
+
+@app.get("/security/{job_id}/report")
+def security_report(request: Request, job_id: str):
+    if not _is_logged_in(request):
+        raise HTTPException(status_code=401, detail="Not authenticated")
+    with JOBS_LOCK:
+        job = JOBS.get(job_id)
+    if job is None or not job.pages:
+        raise HTTPException(status_code=404, detail="Job not found")
+    start_url = str(job.params.get("start_url") or job.pages[0].get("url") or "")
+    if not start_url:
+        raise HTTPException(status_code=400, detail="No URL to check")
+    report = _fetch_security_report(start_url)
+    print("[security] report for", start_url, json.dumps(report, ensure_ascii=False)[:500])
+    return report

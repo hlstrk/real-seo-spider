@@ -1,0 +1,460 @@
+{% extends "base.html" %}
+{% set title = "Sonuçlar" %}
+
+{% block content %}
+  <div class="layout">
+    <aside class="leftnav">
+      <div class="card leftnav__card">
+        <h3>Kategoriler</h3>
+        {% if job and job.status == "done" and issues_count > 0 %}
+          <div class="cats" id="catList">
+            <button class="cat cat--active" type="button" data-cat="__all__">
+              <span>Tümü</span>
+              <span class="pill pill--muted">{{ issues_count }}</span>
+            </button>
+            {% for (cat, count) in categories %}
+              <button class="cat" type="button" data-cat="{{ cat }}">
+                <span>{{ cat }}</span>
+                <span class="pill pill--muted">{{ count }}</span>
+              </button>
+            {% endfor %}
+          </div>
+          <div class="hint" style="margin-top:10px">Kategori seçince checklist filtrelenir.</div>
+        {% else %}
+          <p class="muted">Kategori listesi için taramanın bitmesini bekleyin.</p>
+        {% endif %}
+      </div>
+    </aside>
+
+    <main class="main">
+      {% if not job %}
+        <div class="card">
+          <h2>Job bulunamadı</h2>
+          <p>Bu ID ile bir tarama yok: <code>{{ job_id }}</code></p>
+          <a class="btn" href="/">Yeni tarama</a>
+        </div>
+      {% else %}
+        <div class="card">
+          <div class="row row--tight">
+            <div>
+              <h2>Genel Özet</h2>
+              <div class="muted">Bu tarama için hızlı özet + SEO tool tarzı şemalar.</div>
+            </div>
+          </div>
+
+          <div class="chart-row" style="margin-top:14px">
+            <div class="chart chart--mini">
+              <div class="chart__title">SEO Skoru</div>
+              <svg class="chart__svg" id="scoreDonut" viewBox="0 0 120 120" aria-label="SEO skoru donut"></svg>
+              <div class="chart__value"><b>{{ seo_score }}%</b></div>
+            </div>
+            <div class="chart chart--mini">
+              <div class="chart__title">Meta</div>
+              <svg class="chart__svg" id="metaDonut" viewBox="0 0 120 120" aria-label="Meta donut"></svg>
+              <div class="chart__value"><b id="metaVal">-</b></div>
+            </div>
+            <div class="chart chart--mini">
+              <div class="chart__title">Başlıklar</div>
+              <svg class="chart__svg" id="headersDonut" viewBox="0 0 120 120" aria-label="Headers donut"></svg>
+              <div class="chart__value"><b id="headersVal">-</b></div>
+            </div>
+            <div class="chart chart--mini">
+              <div class="chart__title">Görseller</div>
+              <svg class="chart__svg" id="imagesDonut" viewBox="0 0 120 120" aria-label="Images donut"></svg>
+              <div class="chart__value"><b id="imagesVal">-</b></div>
+            </div>
+            <div class="chart chart--mini">
+              <div class="chart__title">Performans</div>
+              <svg class="chart__svg" id="perfDonut" viewBox="0 0 120 120" aria-label="Performance donut"></svg>
+              <div class="chart__value"><b id="perfVal">-</b></div>
+            </div>
+            <div class="chart">
+              <div class="chart__title">Sorun Dağılımı</div>
+              <svg class="chart__svg" id="issuesPie" viewBox="0 0 120 120" width="120" height="120" aria-label="Issue pie"></svg>
+              <div class="chart__legend" id="issuesLegend"></div>
+            </div>
+          </div>
+
+          {% if site_summary %}
+            <p class="summary">{{ site_summary }}</p>
+          {% endif %}
+        </div>
+
+        <div class="card">
+          <div class="row row--tight">
+            <div>
+              <h2>Sonuçlar</h2>
+              <div class="muted">Tarama ID: <code>{{ job_id }}</code></div>
+              <div class="muted">Başlangıç: <code>{{ job.params.get("start_url") }}</code></div>
+            </div>
+            <div class="spacer"></div>
+            <a class="btn btn--ghost" href="/download/{{ job_id }}/issues.csv">CSV indir</a>
+            <a class="btn btn--ghost" href="/download/{{ job_id }}/report.json">JSON indir</a>
+          </div>
+
+          <div class="status">
+            <span class="pill pill--{{ job.status }}">{{ TR.status.get(job.status, job.status) }}</span>
+            {% if job.status in ["queued","running"] %}
+              <span class="muted">Tarama devam ediyor; bu sayfa otomatik yenilenir.</span>
+            {% endif %}
+            {% if job.status == "error" %}
+              <div class="error">Hata: {{ job.error }}</div>
+            {% endif %}
+          </div>
+
+          <div class="stats">
+            <div class="stat">
+              <div class="stat__label">Sayfalar</div>
+              <div class="stat__value">{{ pages_count }}</div>
+            </div>
+            <div class="stat">
+              <div class="stat__label">Sorunlar</div>
+              <div class="stat__value">{{ issues_count }}</div>
+            </div>
+          </div>
+        </div>
+
+        {% if job.status == "done" %}
+          <div class="card">
+            <div class="row row--tight">
+              <h3 style="margin:0">Checklist</h3>
+              <div class="spacer"></div>
+              <button class="btn btn--ghost" type="button" id="clearChecks">Tümünü sıfırla</button>
+            </div>
+
+            {% if issues_count == 0 %}
+              <p>Issue bulunamadı.</p>
+            {% else %}
+              <div class="checks" data-job="{{ job_id }}" id="checksWrap">
+                {% for it in job.issues %}
+                  {% set ev = (it.evidence or "") %}
+                  {% set thumb = "" %}
+                  {% if it.field and it.field.startswith("img_") and (ev.startswith("http://") or ev.startswith("https://")) %}
+                    {% set thumb = ev.split(" | ")[0] %}
+                  {% endif %}
+                  {% set thumb_base = thumb.split("?")[0].split("#")[0].lower() %}
+                  {% set is_thumb_ok = thumb and (thumb_base.endswith(".jpg") or thumb_base.endswith(".jpeg") or thumb_base.endswith(".png") or thumb_base.endswith(".webp") or thumb_base.endswith(".avif") or thumb_base.endswith(".gif") or thumb_base.endswith(".svg")) %}
+                  <label class="check" data-category="{{ it.category }}">
+                    <input type="checkbox" data-k="{{ loop.index0 }}" />
+                  {% if is_thumb_ok %}
+                    <img class="thumb" src="{{ thumb }}" alt="thumbnail" loading="lazy" />
+                  {% endif %}
+                  <span class="check__badge sev sev--{{ it.severity }}">{{ TR.severity.get(it.severity, it.severity) }}</span>
+                  <span class="check__text">
+                    <span class="check__title">{{ it.message }}</span>
+                    <span class="check__meta">
+                      <code>{{ it.category }}</code> • <code>{{ TR.issue_type.get(it.issue_type, it.issue_type) }}</code> • <code>{{ TR.field.get(it.field, it.field) }}</code> •
+                      <a href="{{ it.url }}" target="_blank" rel="noreferrer">{{ it.url }}</a>
+                      {% if it.suggestion %} • <span class="muted">{{ it.suggestion }}</span>{% endif %}
+                        {% if it.evidence %}
+                          •
+                          {% if it.evidence.startswith("http://") or it.evidence.startswith("https://") %}
+                            <a href="{{ it.evidence }}" target="_blank" rel="noreferrer">{{ it.evidence|truncate(70, True, "…") }}</a>
+                          {% elif it.evidence.startswith("data:") or it.evidence.startswith("data://") %}
+                            <span class="muted">inline veri ({{ it.evidence|length }} karakter)</span>
+                          {% else %}
+                            <span class="muted">{{ it.evidence|truncate(80, True, "…") }}</span>
+                          {% endif %}
+                        {% endif %}
+                        • <a class="mini-link" href="/issue/{{ job_id }}/{{ loop.index0 }}">Sorunu gör</a>
+                      </span>
+                    </span>
+                  </label>
+                {% endfor %}
+              </div>
+            {% endif %}
+          </div>
+
+          <div class="card">
+            <h3>Sayfa Detayları</h3>
+            {% for p in job.pages %}
+              <details class="details" {% if loop.index0 == 0 %}open{% endif %}>
+                <summary>
+                  <span class="details__title">{{ p.final_url or p.url }}</span>
+                  <span class="pill pill--muted">{{ p.status_code }}</span>
+                  {% if p.html_lang %}<span class="pill pill--muted">{{ p.html_lang }}</span>{% endif %}
+                </summary>
+                <div class="details__body">
+                  {% set purl = p.final_url or p.url %}
+                  {% if page_summaries and page_summaries.get(purl) %}
+                    <div class="page-summary">
+                      <div class="page-summary__title">Bu sayfanın genel sorunu</div>
+                      <div class="page-summary__text">{{ page_summaries.get(purl) }}</div>
+                    </div>
+                  {% endif %}
+                  <div class="kv">
+                    <div class="kv__k">Title</div>
+                    <div class="kv__v">{{ p.title or "-" }}</div>
+                    <div class="kv__k">Meta desc</div>
+                    <div class="kv__v">{{ p.meta_description or "-" }}</div>
+                    <div class="kv__k">H1</div>
+                    <div class="kv__v">{{ p.h1 or "-" }}</div>
+                    <div class="kv__k">Canonical</div>
+                    <div class="kv__v">{% if p.canonical %}<a href="{{ p.canonical }}" target="_blank" rel="noreferrer">{{ p.canonical }}</a>{% else %}-{% endif %}</div>
+                    <div class="kv__k">HSTS</div>
+                    <div class="kv__v">{% if p.hsts %}<code>{{ p.hsts }}</code>{% else %}<span class="muted">missing</span>{% endif %}</div>
+                  </div>
+
+                  <div class="subhead">Görseller</div>
+                  {% if not p.images %}
+                    <div class="muted">Görsel bulunamadı.</div>
+                  {% else %}
+                    <div class="table-wrap">
+                      <table class="table table--compact table--fixed">
+                        <thead>
+                          <tr>
+                            <th style="width:120px">Alaka</th>
+                            <th style="width:180px">Alt</th>
+                            <th style="width:220px">Filename</th>
+                            <th>Src</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {% for im in p.images %}
+                          <tr class="{% if not im.alt %}row-warn{% endif %}">
+                            <td class="cell-clip">
+                              {% set rel = (image_relevance.get(purl, {}) if image_relevance else {}) %}
+                              {% set score = rel.get(im.src) %}
+                              {% if score is number %}
+                                <span class="pill pill--muted" title="OpenAI skoru (0-100)">{{ score }}%</span>
+                              {% else %}
+                                <span class="muted">-</span>
+                              {% endif %}
+                            </td>
+                            <td class="cell-clip">{% if im.alt %}{{ im.alt }}{% else %}<span class="muted">EKSİK</span>{% endif %}</td>
+                            <td class="cell-clip"><code>{{ im.filename or "-" }}</code></td>
+                            <td class="url cell-clip">
+                              {% if im.src.startswith("data:") or im.src.startswith("data://") %}
+                                <span class="muted">inline veri ({{ im.src|length }} karakter)</span>
+                              {% else %}
+                                <a href="{{ im.src }}" target="_blank" rel="noreferrer" title="{{ im.src }}">{{ im.src|truncate(90, True, "…") }}</a>
+                              {% endif %}
+                            </td>
+                          </tr>
+                          {% endfor %}
+                        </tbody>
+                      </table>
+                    </div>
+                  {% endif %}
+                </div>
+              </details>
+            {% endfor %}
+          </div>
+        {% endif %}
+      {% endif %}
+    </main>
+
+    <aside class="side">
+      <div class="card">
+        <h3>Önceki Taramalar</h3>
+        {% if not jobs %}
+          <p class="muted">Henüz tarama yok.</p>
+        {% else %}
+          <div class="jobs">
+            {% for j in jobs %}
+              <a class="job {% if j.id == job_id %}job--active{% endif %}" href="/results/{{ j.id }}">
+                <div class="job__row">
+                  <span class="pill pill--{{ j.status }}">{{ TR.status.get(j.status, j.status) }}</span>
+                  <span class="job__id">{{ j.id }}</span>
+                </div>
+                <div class="job__meta">
+                  <div class="job__url">{{ (j.params.get("start_url") or "")|truncate(60, True, "…") }}</div>
+                  <div class="muted">{{ (j.params.get("mode") or "") }} • {{ (j.params.get("fetcher") or "") }}</div>
+                </div>
+              </a>
+            {% endfor %}
+          </div>
+        {% endif %}
+      </div>
+    </aside>
+  </div>
+
+  <script>
+    (function () {
+      // Charts
+      const score = Number({{ seo_score|default(0) }}) || 0;
+      const sevCounts = {{ severity_counts|tojson }};
+      const donuts = {{ donuts|tojson }};
+
+      function polarToCartesian(cx, cy, r, angleDeg) {
+        const a = (angleDeg - 90) * Math.PI / 180.0;
+        return { x: cx + (r * Math.cos(a)), y: cy + (r * Math.sin(a)) };
+      }
+      function arcPath(cx, cy, r, startAngle, endAngle) {
+        const start = polarToCartesian(cx, cy, r, endAngle);
+        const end = polarToCartesian(cx, cy, r, startAngle);
+        const largeArc = (endAngle - startAngle) <= 180 ? "0" : "1";
+        return `M ${start.x} ${start.y} A ${r} ${r} 0 ${largeArc} 0 ${end.x} ${end.y}`;
+      }
+
+      function renderDonut(svg, value) {
+        if (!svg) return;
+        svg.innerHTML = "";
+        const style = getComputedStyle(document.documentElement);
+        const c1 = (style.getPropertyValue("--accent") || "#4f46e5").trim();
+        const c2 = (style.getPropertyValue("--accent2") || "#06b6d4").trim();
+        const cx = 60, cy = 60, r = 44, w = 12;
+        const base = document.createElementNS("http://www.w3.org/2000/svg", "circle");
+        base.setAttribute("cx", String(cx));
+        base.setAttribute("cy", String(cy));
+        base.setAttribute("r", String(r));
+        base.setAttribute("fill", "none");
+        base.setAttribute("stroke", "rgba(255,255,255,.18)");
+        base.setAttribute("stroke-width", String(w));
+        svg.appendChild(base);
+
+        const arc = document.createElementNS("http://www.w3.org/2000/svg", "path");
+        const end = Math.max(0, Math.min(100, value)) / 100 * 360;
+        arc.setAttribute("d", arcPath(cx, cy, r, 0, end));
+        arc.setAttribute("fill", "none");
+        arc.setAttribute("stroke", "url(#gradScore)");
+        arc.setAttribute("stroke-width", String(w));
+        arc.setAttribute("stroke-linecap", "round");
+
+        const defs = document.createElementNS("http://www.w3.org/2000/svg", "defs");
+        const grad = document.createElementNS("http://www.w3.org/2000/svg", "linearGradient");
+        grad.setAttribute("id", "gradScore");
+        grad.setAttribute("x1", "0%"); grad.setAttribute("y1", "0%");
+        grad.setAttribute("x2", "100%"); grad.setAttribute("y2", "100%");
+        const s1 = document.createElementNS("http://www.w3.org/2000/svg", "stop");
+        s1.setAttribute("offset", "0%");
+        s1.setAttribute("stop-color", c1);
+        const s2 = document.createElementNS("http://www.w3.org/2000/svg", "stop");
+        s2.setAttribute("offset", "100%");
+        s2.setAttribute("stop-color", c2);
+        grad.appendChild(s1); grad.appendChild(s2);
+        defs.appendChild(grad);
+        svg.appendChild(defs);
+        svg.appendChild(arc);
+
+        const text = document.createElementNS("http://www.w3.org/2000/svg", "text");
+        text.setAttribute("x", String(cx));
+        text.setAttribute("y", String(cy + 6));
+        text.setAttribute("text-anchor", "middle");
+        text.setAttribute("font-size", "18");
+        text.setAttribute("font-weight", "900");
+        text.setAttribute("fill", "currentColor");
+        text.textContent = `${Math.round(value)}%`;
+        svg.appendChild(text);
+      }
+
+      function renderPie(svg, legend, data) {
+        if (!svg) return;
+        svg.innerHTML = "";
+        if (legend) legend.innerHTML = "";
+        const cx = 60, cy = 60, r = 50;
+        const total = Object.values(data).reduce((a,b) => a + (Number(b)||0), 0) || 0;
+        if (!total) {
+          const t = document.createElementNS("http://www.w3.org/2000/svg", "text");
+          t.setAttribute("x", String(cx));
+          t.setAttribute("y", String(cy));
+          t.setAttribute("text-anchor", "middle");
+          t.setAttribute("font-size", "12");
+          t.setAttribute("fill", "currentColor");
+          t.textContent = "0";
+          svg.appendChild(t);
+          return;
+        }
+        const palette = {
+          high: "rgba(255,85,120,.9)",
+          medium: "rgba(255,194,69,.9)",
+          low: "rgba(54,211,153,.9)"
+        };
+        let start = 0;
+        for (const k of ["high","medium","low"]) {
+          const v = Number(data[k] || 0);
+          if (!v) continue;
+          const angle = (v / total) * 360;
+          const end = start + angle;
+          const p = document.createElementNS("http://www.w3.org/2000/svg", "path");
+          const a0 = polarToCartesian(cx, cy, r, end);
+          const a1 = polarToCartesian(cx, cy, r, start);
+          const large = angle > 180 ? 1 : 0;
+          const d = [
+            `M ${cx} ${cy}`,
+            `L ${a1.x} ${a1.y}`,
+            `A ${r} ${r} 0 ${large} 1 ${a0.x} ${a0.y}`,
+            "Z"
+          ].join(" ");
+          p.setAttribute("d", d);
+          p.setAttribute("fill", palette[k] || "rgba(255,255,255,.3)");
+          svg.appendChild(p);
+          if (legend) {
+            const item = document.createElement("div");
+            item.className = "legend-item";
+            item.innerHTML = `<span class="dot" style="background:${palette[k] || "#999"}"></span><span>${k}: ${v}</span>`;
+            legend.appendChild(item);
+          }
+          start = end;
+        }
+      }
+
+      renderDonut(document.getElementById("scoreDonut"), score);
+      renderDonut(document.getElementById("metaDonut"), Number(donuts.meta||0));
+      renderDonut(document.getElementById("headersDonut"), Number(donuts.headers||0));
+      renderDonut(document.getElementById("imagesDonut"), Number(donuts.images||0));
+      renderDonut(document.getElementById("perfDonut"), Number(donuts.performance||0));
+      const mv = document.getElementById("metaVal"); if (mv) mv.textContent = `${Math.round(Number(donuts.meta||0))}%`;
+      const hv = document.getElementById("headersVal"); if (hv) hv.textContent = `${Math.round(Number(donuts.headers||0))}%`;
+      const iv = document.getElementById("imagesVal"); if (iv) iv.textContent = `${Math.round(Number(donuts.images||0))}%`;
+      const pv = document.getElementById("perfVal"); if (pv) pv.textContent = `${Math.round(Number(donuts.performance||0))}%`;
+      renderPie(document.getElementById("issuesPie"), document.getElementById("issuesLegend"), sevCounts);
+
+      // Category filtering
+      const list = document.getElementById("catList");
+      const wrapChecks = document.getElementById("checksWrap");
+      function setActive(cat) {
+        if (!list) return;
+        for (const b of list.querySelectorAll(".cat")) {
+          b.classList.toggle("cat--active", b.getAttribute("data-cat") === cat);
+        }
+      }
+      function applyFilter(cat) {
+        if (!wrapChecks) return;
+        for (const row of wrapChecks.querySelectorAll(".check[data-category]")) {
+          const c = row.getAttribute("data-category") || "general";
+          const show = cat === "__all__" || c === cat;
+          row.style.display = show ? "" : "none";
+        }
+      }
+      if (list && wrapChecks) {
+        list.addEventListener("click", (e) => {
+          const btn = e.target.closest(".cat");
+          if (!btn) return;
+          const cat = btn.getAttribute("data-cat") || "__all__";
+          setActive(cat);
+          applyFilter(cat);
+        });
+      }
+
+      // Checklist state
+      const wrap = document.querySelector(".checks");
+      if (!wrap) return;
+      const jobId = wrap.getAttribute("data-job");
+      const storageKey = "rss_checks_" + jobId;
+      const saved = JSON.parse(localStorage.getItem(storageKey) || "{}");
+
+      for (const input of wrap.querySelectorAll("input[type=checkbox][data-k]")) {
+        const k = input.getAttribute("data-k");
+        input.checked = !!saved[k];
+        input.addEventListener("change", () => {
+          saved[k] = input.checked;
+          localStorage.setItem(storageKey, JSON.stringify(saved));
+          input.closest(".check")?.classList.toggle("check--done", input.checked);
+        });
+        input.closest(".check")?.classList.toggle("check--done", input.checked);
+      }
+
+      const clearBtn = document.getElementById("clearChecks");
+      if (clearBtn) {
+        clearBtn.addEventListener("click", () => {
+          localStorage.removeItem(storageKey);
+          for (const input of wrap.querySelectorAll("input[type=checkbox][data-k]")) {
+            input.checked = false;
+            input.closest(".check")?.classList.remove("check--done");
+          }
+        });
+      }
+    })();
+  </script>
+{% endblock %}

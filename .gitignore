@@ -1,0 +1,14 @@
+# Python
+__pycache__/
+*.py[cod]
+.Python
+.venv/
+venv/
+ENV/
+
+# Local config / outputs
+config.py
+out/
+*.csv
+*.json
+

@@ -1,0 +1,115 @@
+{% extends "base.html" %}
+{% set title = "Yeni Tarama" %}
+
+{% block content %}
+  <div class="split">
+    <div>
+      <div class="hero">
+        <h1>SEO Taraması Başlat</h1>
+        <p>
+          Cloudflare nedeniyle varsayılan fetcher <code>chromium</code>.
+          Tarama bitince otomatik olarak <b>Sonuçlar</b> sayfasına yönlendirilir.
+        </p>
+      </div>
+
+      <form class="card" method="post" action="/scan">
+        <div class="grid">
+          <div class="field">
+            <label>Start URL</label>
+            <input name="start_url" value="{{ defaults.start_url }}" placeholder="https://lemaclinic.com/" required />
+          </div>
+          <div class="field">
+            <label>Domain</label>
+            <input name="domain" value="{{ defaults.domain }}" placeholder="lemaclinic.com" required />
+          </div>
+
+          <div class="field">
+            <label>Mode</label>
+            <select name="mode">
+              <option value="single" {% if defaults.mode == "single" %}selected{% endif %}>single</option>
+              <option value="crawl" {% if defaults.mode == "crawl" %}selected{% endif %}>crawl</option>
+            </select>
+          </div>
+          <div class="field">
+            <label>Fetcher</label>
+            <select name="fetcher">
+              <option value="chromium" {% if defaults.fetcher == "chromium" %}selected{% endif %}>chromium (önerilen)</option>
+              <option value="requests" {% if defaults.fetcher == "requests" %}selected{% endif %}>requests</option>
+            </select>
+          </div>
+
+          <div class="field">
+            <label>Scope Prefix(es) (virgülle)</label>
+            <input name="scope_prefixes" value="{{ defaults.scope_prefixes }}" placeholder="/, /en/" />
+            <div class="hint">İngilizce sayfalar direkt domain altındaysa: <code>/</code></div>
+          </div>
+          <div class="field">
+            <label>Require &lt;html lang&gt;</label>
+            <input name="require_lang" value="{{ defaults.require_lang }}" placeholder="en" />
+            <div class="hint">Boş bırakırsan dil filtresi uygulanmaz.</div>
+          </div>
+
+          <div class="field">
+            <label>Max Pages (crawl)</label>
+            <input name="max_pages" type="number" min="1" value="{{ defaults.max_pages }}" />
+          </div>
+          <div class="field">
+            <label>Timeout (sec)</label>
+            <input name="timeout" type="number" min="1" value="{{ defaults.timeout }}" />
+          </div>
+
+          <div class="field">
+            <label>GPT Model</label>
+            <input name="model" value="{{ defaults.model }}" placeholder="gpt-4o-mini" />
+            <div class="hint">API key UI'da yok. Key'i env var veya koda ekleyin.</div>
+          </div>
+          <div class="field">
+            <label>GPT sleep (sec)</label>
+            <input name="sleep" type="number" min="0" step="0.1" value="{{ defaults.sleep }}" />
+          </div>
+        </div>
+
+        <div class="row">
+          <label class="checkbox">
+            <input type="checkbox" name="use_sitemap" />
+            sitemap kullan (crawl)
+          </label>
+          <label class="checkbox">
+            <input type="checkbox" name="follow_redirects" />
+            redirect takip et (single)
+          </label>
+          <label class="checkbox">
+            <input type="checkbox" name="no_gpt" />
+            GPT kapalı
+          </label>
+          <div class="spacer"></div>
+          <button class="btn" type="submit">Taramayı Başlat</button>
+        </div>
+      </form>
+    </div>
+
+    <aside class="side">
+      <div class="card">
+        <h3>Önceki Taramalar</h3>
+        {% if not jobs %}
+          <p class="muted">Henüz tarama yok.</p>
+        {% else %}
+          <div class="jobs">
+            {% for j in jobs %}
+              <a class="job" href="/results/{{ j.id }}">
+                <div class="job__row">
+                  <span class="pill pill--{{ j.status }}">{{ TR.status.get(j.status, j.status) }}</span>
+                  <span class="job__id">{{ j.id }}</span>
+                </div>
+                <div class="job__meta">
+                  <div class="job__url">{{ (j.params.get("start_url") or "")|truncate(60, True, "…") }}</div>
+                  <div class="muted">{{ (j.params.get("mode") or "") }} • {{ (j.params.get("fetcher") or "") }}</div>
+                </div>
+              </a>
+            {% endfor %}
+          </div>
+        {% endif %}
+      </div>
+    </aside>
+  </div>
+{% endblock %}

@@ -1,0 +1,47 @@
+{% extends "base.html" %}
+{% set title = "Sorun Detayı" %}
+
+{% block content %}
+  <div class="card">
+    <div class="row row--tight">
+      <div>
+        <h2>Sorun Detayı</h2>
+        <div class="muted">Job: <code>{{ job_id }}</code> • #<code>{{ idx }}</code></div>
+      </div>
+      <div class="spacer"></div>
+      <a class="btn btn--ghost" href="/results/{{ job_id }}">Sonuçlara dön</a>
+    </div>
+
+    <div class="checks" style="margin-top:14px">
+      <div class="check">
+        <span class="check__badge sev sev--{{ issue.severity }}">{{ TR.severity.get(issue.severity, issue.severity) }}</span>
+        <span class="check__text">
+          <span class="check__title">{{ issue.message }}</span>
+          <span class="check__meta">
+            <code>{{ issue.category }}</code> • <code>{{ TR.issue_type.get(issue.issue_type, issue.issue_type) }}</code> • <code>{{ TR.field.get(issue.field, issue.field) }}</code>
+            • <a href="{{ issue.url }}" target="_blank" rel="noreferrer">{{ issue.url }}</a>
+            {% if issue.suggestion %} • <span class="muted">{{ issue.suggestion }}</span>{% endif %}
+            {% if issue.evidence %}
+              •
+              {% if issue.evidence.startswith("http://") or issue.evidence.startswith("https://") %}
+                <a href="{{ issue.evidence }}" target="_blank" rel="noreferrer">{{ issue.evidence|truncate(90, True, "…") }}</a>
+              {% elif issue.evidence.startswith("data:") or issue.evidence.startswith("data://") %}
+                <span class="muted">inline veri ({{ issue.evidence|length }} karakter)</span>
+              {% else %}
+                <span class="muted">{{ issue.evidence|truncate(120, True, "…") }}</span>
+              {% endif %}
+            {% endif %}
+          </span>
+        </span>
+      </div>
+    </div>
+  </div>
+
+  <div class="card">
+    <h3>Ekran Görüntüsü</h3>
+    <p class="muted">Kırmızı kutu mümkünse sorunun olduğu elementi işaretler.</p>
+    <div class="shot">
+      <img src="/shot/{{ job_id }}/{{ idx }}.png" alt="screenshot" />
+    </div>
+  </div>
+{% endblock %}
